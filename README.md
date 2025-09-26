@@ -1,10 +1,8 @@
-# Proyecto Fase 1 - Equipo XX
+# Proyecto - Equipo 46
 
 Este proyecto implementa un flujo de **MLOps** con el dataset **German Credit**, 
 con el objetivo de predecir el riesgo crediticio de clientes a partir de datos históricos.  
-El trabajo corresponde a la **Fase 1** del proyecto de curso, en la cual se aborda el análisis, 
-limpieza, exploración y modelado inicial de los datos, además del uso de herramientas de 
-**versionado de datos** y **automatización**.
+
 
 ---
 
@@ -53,8 +51,8 @@ limpieza, exploración y modelado inicial de los datos, además del uso de herra
 ## ⚙️ Instalación
 1. Clonar el repositorio:
    ```bash
-   git clone https://github.com/usuario/fase1_equipoXX_german_credit.git
-   cd fase1_equipoXX_german_credit
+   git clone https://github.com/jmtoral/mna-mlops-team46.git
+   cd mna-mlops-team46
    ```
 
 2. Crear entorno virtual e instalar dependencias:
@@ -116,15 +114,18 @@ jupyter notebook notebooks/
 ---
 
 ## 👥 Roles del Equipo
-- **Data Engineer** → Limpieza, transformación, versionado de datos.  
-- **Data Analyst** → Análisis exploratorio y visualizaciones.  
-- **ML Engineer** → Entrenamiento y evaluación de modelos.  
-- **Project Manager** → Coordinación, documentación y entregables.  
+| Integrante | Matrícula | Rol |
+|---|---|---|
+| Jesús Alberto Jiménez Ramos | `A01796903` | 📊 Data Engineer |
+| Mónica María Del Rivero Sánchez | `A01362368` | 👩‍🔬 Data Scientist |
+| Montserrat Gaytán Morales | `A01332220` | 💻 Software Engineer |
+| José Manuel Toral Cruz | `A01122243` | 🤖 ML Engineer |
+| Jeanette Rios Martinez | `A01688888` | 🛠️ SRE / DevOps |
 
 ---
 
 ## 📑 Entregables
-- Reporte en PDF (`reports/fase1_equipoXX.pdf`) con:
+- Reporte en PDF (`reports/fase1_equipo46.pdf`) con:
   - Análisis de requerimientos (ML Canvas).
   - Exploración, limpieza y preprocesamiento de datos.
   - Versionado con DVC.
