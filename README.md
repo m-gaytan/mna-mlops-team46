@@ -4,7 +4,22 @@
     <img src="https://img.shields.io/badge/CCDS-Project%20template-328F97?logo=cookiecutter" />
 </a>
 
-This is the Project from Team 46
+# Proyecto - Equipo 46
+
+Este proyecto implementa un flujo de **MLOps** con el dataset **German Credit**, 
+con el objetivo de predecir el riesgo crediticio de clientes a partir de datos históricos.  
+
+
+---
+
+## 🎯 Objetivos
+- Analizar la problemática del dataset German Credit.
+- Realizar **EDA** (Exploratory Data Analysis) y limpieza de datos.
+- Aplicar técnicas de **preprocesamiento** (codificación, normalización, manejo de outliers).
+- Implementar **versionado de datos** con DVC para trazabilidad.
+- Construir, entrenar y evaluar **modelos de Machine Learning**.
+- Documentar los resultados y roles de equipo en un flujo de trabajo estilo **MLOps**.
+
 
 ## Project Organization
 
@@ -59,3 +74,47 @@ This is the Project from Team 46
 
 --------
 
+---
+
+## 📊 Resultados Esperados
+- Comparación de dataset crudo vs dataset limpio (valores nulos, outliers, transformaciones).
+- Visualización de patrones y correlaciones en los datos.
+- Modelos base (Regresión Logística, Árboles de Decisión) entrenados y evaluados.
+- Métricas reportadas: Accuracy, Recall, ROC-AUC.
+
+---
+
+## 🛠️ Herramientas Utilizadas
+- **Python** (Pandas, NumPy, Scikit-learn, Matplotlib, Seaborn)
+- **DVC** (Data Version Control)
+- **GitHub** (control de versiones y colaboración)
+- **Makefile** (automatización de tareas)
+- **Jupyter Notebooks**
+
+---
+
+## 👥 Roles del Equipo
+| Integrante | Matrícula | Rol |
+|---|---|---|
+| Jesús Alberto Jiménez Ramos | `A01796903` | 📊 Data Engineer |
+| Mónica María Del Rivero Sánchez | `A01362368` | 👩‍🔬 Data Scientist |
+| Montserrat Gaytán Morales | `A01332220` | 💻 Software Engineer |
+| José Manuel Toral Cruz | `A01122243` | 🤖 ML Engineer |
+| Jeanette Rios Martinez | `A01688888` | 🛠️ SRE / DevOps |
+
+---
+
+## 📑 Entregables
+- Reporte en PDF (`reports/fase1_equipo46.pdf`) con:
+  - Análisis de requerimientos (ML Canvas).
+  - Exploración, limpieza y preprocesamiento de datos.
+  - Versionado con DVC.
+  - Construcción, ajuste y evaluación de modelos.
+  - Conclusiones y reflexión final.
+- Link al **video explicativo (5-10 min)** en equipo.
+- Link a este repositorio de GitHub.
+
+---
+
+## 📜 Licencia
+Este proyecto está bajo la licencia MIT. Ver archivo [LICENSE](LICENSE) para más detalles.
