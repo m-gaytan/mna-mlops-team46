@@ -10,6 +10,33 @@ import yaml
 
 LOGGER = logging.getLogger(__name__)
 
+# german_credit_ml/clean.py
+
+# --- Renombre de columnas del dataset original ---
+COLUMN_MAPPING = {
+    'laufkont': 'status',
+    'laufzeit': 'duration',
+    'moral': 'credit_history',
+    'verw': 'purpose',
+    'hoehe': 'amount',
+    'sparkont': 'savings',
+    'beszeit': 'employment_duration',
+    'rate': 'installment_rate',
+    'famges': 'personal_status_sex',
+    'buerge': 'other_debtors',
+    'wohnzeit': 'present_residence',
+    'verm': 'property',
+    'alter': 'age',
+    'weitkred': 'other_installment_plans',
+    'wohn': 'housing',
+    'bishkred': 'number_credits',
+    'beruf': 'job',
+    'pers': 'people_liable',
+    'telef': 'telephone',
+    'gastarb': 'foreign_worker',
+    'kredit': 'credit_risk'
+}
+
 
 # ----------------------------
 # Utilidades de configuración
@@ -112,8 +139,11 @@ def run_clean(input_path: Path, output_path: Path):
     LOGGER.info(f"Leyendo datos de: {input_path}")
     df = pd.read_csv(input_path)
 
-    LOGGER.info("Normalizando target credit_risk…")
-    df = normalize_credit_risk(df)
+    # aplicar renombres
+    df = df.rename(columns=COLUMN_MAPPING)
+
+    if "credit_risk" not in df.columns:
+        raise AssertionError("Falta columna objetivo 'credit_risk'. Verifica COLUMN_MAPPING.")
 
     LOGGER.info("Casteando tipos base…")
     df = cast_types(df)
