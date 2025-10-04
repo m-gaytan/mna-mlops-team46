@@ -1,28 +1,32 @@
 from pathlib import Path
-
 from loguru import logger
-from tqdm import tqdm
 import typer
+import pandas as pd
 
 from german_credit_ml.config import PROCESSED_DATA_DIR, RAW_DATA_DIR
+from german_credit_ml.clean import normalize_credit_risk, cast_types, impute_and_enforce
 
 app = typer.Typer()
 
 
 @app.command()
 def main(
-    # ---- REPLACE DEFAULT PATHS AS APPROPRIATE ----
-    input_path: Path = RAW_DATA_DIR / "dataset.csv",
-    output_path: Path = PROCESSED_DATA_DIR / "dataset.csv",
-    # ----------------------------------------------
+    input_path: Path = RAW_DATA_DIR / "german_credit_modified.csv",
+    output_path: Path = PROCESSED_DATA_DIR / "german_credit_clean.csv",
 ):
-    # ---- REPLACE THIS WITH YOUR OWN CODE ----
-    logger.info("Processing dataset...")
-    for i in tqdm(range(10), total=10):
-        if i == 5:
-            logger.info("Something happened for iteration 5.")
-    logger.success("Processing dataset complete.")
-    # -----------------------------------------
+    """Procesa el dataset raw -> processed con limpieza incluida."""
+    logger.info(f"Leyendo datos crudos desde: {input_path}")
+    df = pd.read_csv(input_path)
+
+    # aplicar limpieza
+    df = normalize_credit_risk(df)
+    df = cast_types(df)
+    df = impute_and_enforce(df)
+
+    logger.info("Guardando datos procesados...")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(output_path, index=False)
+    logger.success(f"Dataset limpio guardado en {output_path}, filas={len(df)}")
 
 
 if __name__ == "__main__":
