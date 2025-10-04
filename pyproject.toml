@@ -1,0 +1,32 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "german_credit_ml"
+version = "0.0.1"
+description = "This is the Project from Team 46"
+authors = [
+  { name = "Team 46 MNA MLOps" },
+]
+license = { file = "LICENSE" }
+readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License"
+]
+requires-python = "~=3.13.0"
+
+
+[tool.ruff]
+line-length = 99
+src = ["german_credit_ml"]
+include = ["pyproject.toml", "german_credit_ml/**/*.py"]
+
+[tool.ruff.lint]
+extend-select = ["I"]  # Add import sorting
+
+[tool.ruff.lint.isort]
+known-first-party = ["german_credit_ml"]
+force-sort-within-sections = true
+
