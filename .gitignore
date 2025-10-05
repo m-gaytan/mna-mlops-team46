@@ -1,5 +1,9 @@
 # Data
-/data/
+/data/**
+# exceptions so DVC metafiles are tracked
+!/data/
+!/data/*.dvc
+!/data/**/*.dvc
 
 # Mac OS-specific storage files
 .DS_Store
