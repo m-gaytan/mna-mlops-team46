@@ -22,7 +22,7 @@ stages:
       size: 77492
   eda:
     cmd: python -m german_credit_ml.eda --input-data 
-      data/processed/german_credit_clean.csv --output-dir reports/figures
+      data/processed/german_credit_clean.csv --output-dir reports/figures/eda
     deps:
     - path: data/processed/german_credit_clean.csv
       hash: md5
@@ -37,7 +37,7 @@ stages:
         data_load.figures: reports/figures
         data_load.processed: data/processed/german_credit_clean.csv
     outs:
-    - path: reports/figures
+    - path: reports/figures/eda
       hash: md5
       md5: 6488b2285f5b36c0925a7c262d50df66.dir
       size: 402564

@@ -11,7 +11,7 @@ stages:
     - data/processed/german_credit_clean.csv
   eda:
     cmd: python -m german_credit_ml.eda --input-data 
-      data/processed/german_credit_clean.csv --output-dir reports/figures
+      data/processed/german_credit_clean.csv --output-dir reports/figures/eda
     deps:
     - data/processed/german_credit_clean.csv
     - german_credit_ml/eda.py
@@ -19,4 +19,20 @@ stages:
     - data_load.figures
     - data_load.processed
     outs:
-    - reports/figures
+    - reports/figures/eda
+  train:
+    cmd: python -m german_credit_ml.modeling/train --input-data 
+      data/processed/german_credit_clean.csv --model-output 
+      models/xgboost_model.pkl --metrics-output reports/metrics.json 
+      --plots-output reports/figures/training
+    deps:
+    - data/processed/german_credit_clean.csv
+    - german_credit_ml/modeling/train.py
+    params:
+    - train
+    outs:
+    - models/xgboost_model.pkl
+    - reports/figures/training
+    metrics:
+    - reports/metrics.json:
+        cache: false
