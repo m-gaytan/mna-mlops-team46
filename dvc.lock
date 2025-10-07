@@ -36,3 +36,9 @@ stages:
       params.yaml:
         data_load.figures: reports/figures
         data_load.processed: data/processed/german_credit_clean.csv
+    outs:
+    - path: reports/figures
+      hash: md5
+      md5: 6488b2285f5b36c0925a7c262d50df66.dir
+      size: 402564
+      nfiles: 5

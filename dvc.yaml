@@ -18,3 +18,5 @@ stages:
     params:
     - data_load.figures
     - data_load.processed
+    outs:
+    - reports/figures
