@@ -1,0 +1,4 @@
+# params.yaml
+data_load:
+  raw: data/raw/german_credit_modified.csv
+  processed: data/processed/german_credit_clean.csv

@@ -1,4 +1,3 @@
-awscli
 ipython
 jupyterlab
 loguru
@@ -13,4 +12,4 @@ ruff
 scikit-learn
 tqdm
 typer
--e .
+awscli
