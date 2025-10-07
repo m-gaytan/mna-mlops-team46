@@ -1,0 +1,22 @@
+schema: '2.0'
+stages:
+  clean_data:
+    cmd: python -m german_credit_ml.clean --config params.yaml
+    deps:
+    - path: data/raw/german_credit_modified.csv
+      hash: md5
+      md5: be16965e43fda504d3406a0e51559da6
+      size: 96764
+    - path: german_credit_ml/clean.py
+      hash: md5
+      md5: f53cbff91588c43ed72e82d7d07f27a9
+      size: 6213
+    params:
+      params.yaml:
+        data_load.processed: data/processed/german_credit_clean.csv
+        data_load.raw: data/raw/german_credit_modified.csv
+    outs:
+    - path: data/processed/german_credit_clean.csv
+      hash: md5
+      md5: 8072a5cf26c1cbf09f217b5007ccae79
+      size: 77492
