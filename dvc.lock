@@ -42,3 +42,40 @@ stages:
       md5: 6488b2285f5b36c0925a7c262d50df66.dir
       size: 402564
       nfiles: 5
+  train:
+    cmd: python -m german_credit_ml.modeling.train --input-data 
+      data/processed/german_credit_clean.csv --model-output 
+      models/xgboost_model.pkl --metrics-output reports/metrics.json 
+      --plots-output reports/figures/training
+    deps:
+    - path: data/processed/german_credit_clean.csv
+      hash: md5
+      md5: 8072a5cf26c1cbf09f217b5007ccae79
+      size: 77492
+    - path: german_credit_ml/modeling/train.py
+      hash: md5
+      md5: 57879efc93d88de4fd7946ffe0bc4294
+      size: 4573
+    params:
+      params.yaml:
+        train:
+          test_size: 0.2
+          random_state: 42
+          n_iter_search: 25
+          model_output: models/xgboost_model.pkl
+          metrics_output: reports/metrics.json
+          plots_output: reports/figures/training
+    outs:
+    - path: models/xgboost_model.pkl
+      hash: md5
+      md5: d6a5b0038fae654640fae59f89b0ae82
+      size: 282293
+    - path: reports/figures/training
+      hash: md5
+      md5: e56ca6048fa61ac8ecebb2b796aff6ba.dir
+      size: 25663
+      nfiles: 1
+    - path: reports/metrics.json
+      hash: md5
+      md5: ff67ac3dfa2f0698b69d1f971b84cbb5
+      size: 317
