@@ -20,3 +20,19 @@ stages:
       hash: md5
       md5: 8072a5cf26c1cbf09f217b5007ccae79
       size: 77492
+  eda:
+    cmd: python -m german_credit_ml.eda --input-data 
+      data/processed/german_credit_clean.csv --output-dir reports/figures
+    deps:
+    - path: data/processed/german_credit_clean.csv
+      hash: md5
+      md5: 8072a5cf26c1cbf09f217b5007ccae79
+      size: 77492
+    - path: german_credit_ml/eda.py
+      hash: md5
+      md5: a5b176793f5d4b94188ba2979e43e899
+      size: 2768
+    params:
+      params.yaml:
+        data_load.figures: reports/figures
+        data_load.processed: data/processed/german_credit_clean.csv
