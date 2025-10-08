@@ -43,39 +43,29 @@ stages:
       size: 402564
       nfiles: 5
   train:
-    cmd: python -m german_credit_ml.modeling.train --input-data 
-      data/processed/german_credit_clean.csv --model-output 
+    cmd: python src/modeling/train_xgb.py --input-data 
+      data/german_credit_modified_cleaned.csv --model-output 
       models/xgboost_model.pkl --metrics-output reports/metrics.json 
       --plots-output reports/figures/training
     deps:
-    - path: data/processed/german_credit_clean.csv
+    - path: data/german_credit_modified_cleaned.csv
       hash: md5
-      md5: 8072a5cf26c1cbf09f217b5007ccae79
-      size: 77492
-    - path: german_credit_ml/modeling/train.py
+      md5: e27fcaf22759653a95720b5d52512d18
+      size: 47256
+    - path: src/modeling/train_xgb.py
       hash: md5
-      md5: 57879efc93d88de4fd7946ffe0bc4294
-      size: 4573
-    params:
-      params.yaml:
-        train:
-          test_size: 0.2
-          random_state: 42
-          n_iter_search: 25
-          model_output: models/xgboost_model.pkl
-          metrics_output: reports/metrics.json
-          plots_output: reports/figures/training
+      md5: 5f2d099f70ec601cada153c867466492
+      size: 8029
     outs:
     - path: models/xgboost_model.pkl
       hash: md5
-      md5: 9e722650f45e78c2a2edcb7405e2a774
-      size: 282973
-    - path: reports/figures/training
+      md5: f09faf32db33a2ff8303f869f95795a8
+      size: 277379
+    - path: reports/figures/training/confusion_matrix.png
       hash: md5
-      md5: 3387c4df4afabf57efaf2f8f63fe2a92.dir
-      size: 25377
-      nfiles: 1
+      md5: a8b5ef359a1087e59b1924783959a987
+      size: 15725
     - path: reports/metrics.json
       hash: md5
-      md5: d1a52c71b3d03089791f1fb00f6c423c
-      size: 317
+      md5: 1d6f67bd4f8efed0a5dcf007862a0eae
+      size: 221

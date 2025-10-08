@@ -1,151 +1,210 @@
 # src/modeling/train_xgb.py
-import argparse, os
+import argparse, json, os, subprocess, getpass, socket
+from datetime import datetime
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import (f1_score, confusion_matrix, ConfusionMatrixDisplay,
-                             roc_auc_score)
+from sklearn.metrics import (
+    f1_score, roc_auc_score, accuracy_score, precision_score, recall_score,
+    ConfusionMatrixDisplay
+)
 
 from xgboost import XGBClassifier
 
 import mlflow
 from mlflow.models import infer_signature
-import getpass, socket, subprocess, os
-from datetime import datetime
+import sklearn, cloudpickle
+
+
+def parse_args():
+    p = argparse.ArgumentParser()
+    p.add_argument("--input-data", required=True)
+    p.add_argument("--model-output", default="models/xgboost_model.pkl")
+    # En dvc.yaml pasas --metrics-output y --plots-output (un directorio)
+    p.add_argument("--metrics-output", default="reports/metrics.json")
+    p.add_argument("--plots-output",   default="reports/figures/training")
+    p.add_argument("--mlflow-experiment", default="fase1_modelado_equipo46")
+    return p.parse_args()
 
 
 def main(args):
-    # Usa tracking local si no quieres mezclarte con el servidor de otro
-    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", f"file:{os.getcwd()}/mlruns"))
-    mlflow.set_experiment(os.getenv("MLFLOW_EXPERIMENT_NAME", "fase1_modelado_equipo46"))
+    # === MLflow: tracking local por defecto (evita mezclar con otros) ===
+    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", f"file:{Path.cwd()/'mlruns'}"))
+    mlflow.set_experiment(os.getenv("MLFLOW_EXPERIMENT_NAME", args.mlflow_experiment))
 
     run_name = f"train_xgb_{getpass.getuser()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    if mlflow.active_run():  # por si quedó algo abierto
+        mlflow.end_run()
+
     with mlflow.start_run(run_name=run_name):
-        
-        # --- antes o después de fit() ---
+        # Etiquetas útiles para distinguir corridas en equipo
         mlflow.set_tag("author", getpass.getuser())
         mlflow.set_tag("host", socket.gethostname())
-        mlflow.set_tag("git_branch", subprocess.check_output(["git","rev-parse","--abbrev-ref","HEAD"]).decode().strip())
-        mlflow.set_tag("git_commit", subprocess.check_output(["git","rev-parse","--short","HEAD"]).decode().strip())
+        try:
+            mlflow.set_tag("git_branch", subprocess.check_output(
+                ["git","rev-parse","--abbrev-ref","HEAD"]).decode().strip())
+            mlflow.set_tag("git_commit", subprocess.check_output(
+                ["git","rev-parse","--short","HEAD"]).decode().strip())
+        except Exception:
+            pass
         mlflow.set_tag("dvc_stage", "train")
-        # si quieres, etiqueta el dataset
-        mlflow.set_tag("dataset", "data/processed/german_credit_clean.csv")
-        # ... entrena, calcula métricas, loggea modelo/figuras ...
+        mlflow.set_tag("dataset", args.input_data)
 
+        # === PASO 1: Carga y Preparación ===
+        print("==== PASO 1: Carga y Preparación de Datos ====")
+        data_path = Path(args.input_data).resolve()
+        assert data_path.exists(), f"No existe el archivo de entrada: {data_path}"
+        print(f"\nCargando: {data_path}")
+        df = pd.read_csv(data_path)
+        print(f"Datos cargados con {df.shape[0]} filas y {df.shape[1]} columnas.")
 
-    print("==== PASO 1: Carga y Preparación de Datos ====")
-    data_path = Path(args.input_data).resolve()
-    print(f"\nCargando: {data_path}")
-    df = pd.read_csv(data_path)
-    print(f"\nDatos cargados con {df.shape[0]} filas y {df.shape[1]} columnas.")
+        TARGET = "credit_risk"
+        X = df.drop(columns=[TARGET])
+        y = df[TARGET]
 
-    TARGET = "credit_risk"  # según tu dataset limpio
-    X = df.drop(columns=[TARGET])
-    y = df[TARGET]
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, stratify=y, random_state=42
+        )
+        print("Datos divididos en train/test.")
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, stratify=y, random_state=42
-    )
-    print("Datos divididos en conjuntos de entrenamiento y prueba.")
+        # === PASO 2: Entrenamiento (XGBoost) ===
+        print("\n==== PASO 2: Entrenamiento del Modelo ====")
+        params = {
+            "n_estimators": 150,
+            "max_depth": 5,
+            "learning_rate": 0.1,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "eval_metric": "logloss",
+            "random_state": 42,
+            "tree_method": "hist",
+            "use_label_encoder": False,
+            "n_jobs": -1,
+        }
+        print("Parámetros XGBoost:", params)
 
-    print("\n==== PASO 2: Entrenamiento del Modelo ====")
-    params = {
-        "n_estimators": 150,
-        "max_depth": 5,
-        "learning_rate": 0.1,
-        "subsample": 0.8,
-        "colsample_bytree": 0.8,
-        "eval_metric": "logloss",
-        "random_state": 42,
-        "tree_method": "hist",         # rápido local
-        "use_label_encoder": False,    # evita warning viejo
-        "n_jobs": -1,
-    }
-    print("\nEntrenando un modelo XGBoost con los siguientes parámetros:")
-    print(params)
+        model = XGBClassifier(**params)
+        model.fit(X_train, y_train)
 
-    clf = XGBClassifier(**params)
-    clf.fit(X_train, y_train)
+        # === PASO 3: Evaluación ===
+        print("\n==== PASO 3: Evaluación, Guardado y Registro ====")
+        y_pred  = model.predict(X_test)
+        y_proba = model.predict_proba(X_test)[:, 1]
 
-    print("\n==== PASO 3: Evaluación, Guardado y Registro ====")
-    y_pred  = clf.predict(X_test)
-    y_proba = clf.predict_proba(X_test)[:, 1]
+        f1  = f1_score(y_test, y_pred)
+        auc = roc_auc_score(y_test, y_proba)
+        acc = accuracy_score(y_test, y_pred)
+        pre = precision_score(y_test, y_pred, zero_division=0)
+        rec = recall_score(y_test, y_pred, zero_division=0)
 
-    f1  = f1_score(y_test, y_pred)
-    auc = roc_auc_score(y_test, y_proba)
-    print(f"\nF1-Score en el conjunto de prueba: {f1:.4f}")
-    print(f"ROC-AUC en el conjunto de prueba: {auc:.4f}")
+        print(f"F1: {f1:.4f} | ROC-AUC: {auc:.4f} | Acc: {acc:.4f} | Prec: {pre:.4f} | Rec: {rec:.4f}")
 
-    # Matriz de confusión → figura
-    fig_out = Path(args.fig_output).resolve()
-    fig_out.parent.mkdir(parents=True, exist_ok=True)
-    fig = plt.figure()
-    ConfusionMatrixDisplay.from_predictions(y_test, y_pred)
-    plt.title("Matriz de confusión (XGB)")
-    plt.savefig(fig_out, bbox_inches="tight")
-    plt.close(fig)
-    print(f"→ Matriz de confusión guardada en: {fig_out}")
+        # === Guardar métricas JSON (para DVC) ===
+        metrics = {
+            "f1": float(f1),
+            "roc_auc": float(auc),
+            "accuracy": float(acc),
+            "precision": float(pre),
+            "recall": float(rec),
+            "n_samples_train": int(len(y_train)),
+            "n_samples_test": int(len(y_test)),
+        }
+        mout = Path(args.metrics_output)
+        mout.parent.mkdir(parents=True, exist_ok=True)
+        with open(mout, "w", encoding="utf-8") as f:
+            json.dump(metrics, f, indent=2)
+        print(f"→ Métricas guardadas en: {mout}")
 
-    # Guardar modelo (pickle)
-    import joblib
-    model_out = Path(args.model_output).resolve()
-    model_out.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(clf, model_out)
-    print(f"→ Modelo guardado en formato .pkl: {model_out}")
+        # === Figuras (usar directorio plots_output) ===
+        plots_dir = Path(args.plots_output)
+        plots_dir.mkdir(parents=True, exist_ok=True)
 
-    # MLflow local (sin cuelgues)
-    mlruns_dir = Path.cwd() / "mlruns"
-    mlflow.set_tracking_uri(f"file:{mlruns_dir}")
-    mlflow.set_experiment(args.mlflow_experiment)
+        fig_cm = plt.figure()
+        ConfusionMatrixDisplay.from_predictions(y_test, y_pred)
+        plt.title("Matriz de confusión (XGB)")
+        cm_path = plots_dir / "confusion_matrix.png"
+        plt.savefig(cm_path, bbox_inches="tight")
+        plt.close(fig_cm)
+        print(f"→ Matriz de confusión guardada en: {cm_path}")
 
-    # Firma e input_example
-    X_example = X_test.iloc[:5].copy()
-    signature = infer_signature(X_example, clf.predict_proba(X_example)[:, 1])
+        # (Opcional) curvas ROC y PR como evidencia
+        try:
+            from sklearn.metrics import RocCurveDisplay, PrecisionRecallDisplay
+            fig_roc = plt.figure()
+            RocCurveDisplay.from_predictions(y_test, y_proba)
+            plt.title("ROC (XGB)")
+            roc_path = plots_dir / "roc_curve.png"
+            plt.savefig(roc_path, bbox_inches="tight")
+            plt.close(fig_roc)
 
-    # Requisitos fijos (evita pip freeze largo)
-    import sklearn, cloudpickle
-    pip_reqs = [
-        f"scikit-learn=={sklearn.__version__}",
-        f"cloudpickle=={cloudpickle.__version__}",
-        "xgboost",
-        "numpy","pandas","matplotlib","mlflow","joblib"
-    ]
+            fig_pr = plt.figure()
+            PrecisionRecallDisplay.from_predictions(y_test, y_proba)
+            plt.title("Precision-Recall (XGB)")
+            pr_path = plots_dir / "precision_recall_curve.png"
+            plt.savefig(pr_path, bbox_inches="tight")
+            plt.close(fig_pr)
+        except Exception:
+            pass
 
-    # Run
-    if mlflow.active_run(): mlflow.end_run()
-    with mlflow.start_run(run_name="xgboost_baseline"):
-        mlflow.log_metric("f1", float(f1))
-        mlflow.log_metric("roc_auc", float(auc))
-        mlflow.log_params(params)
+        # === Guardar modelo (pickle) ===
+        import joblib
+        model_out = Path(args.model_output)
+        model_out.parent.mkdir(parents=True, exist_ok=True)
+        joblib.dump(model, model_out)
+        print(f"→ Modelo guardado en: {model_out}")
 
-        # artefactos
-        mlflow.log_artifact(str(fig_out), artifact_path="figures")
+        # === Log a MLflow: métricas, artefactos y modelo ===
+        # Métricas
+        for k, v in metrics.items():
+            mlflow.log_metric(k, v)
 
-        # modelo
+        # Artefactos (métricas y figuras)
+        if mout.exists():
+            mlflow.log_artifact(str(mout))
+        if cm_path.exists():
+            mlflow.log_artifact(str(cm_path), artifact_path="figures")
+        if 'roc_path' in locals() and Path(roc_path).exists():
+            mlflow.log_artifact(str(roc_path), artifact_path="figures")
+        if 'pr_path' in locals() and Path(pr_path).exists():
+            mlflow.log_artifact(str(pr_path), artifact_path="figures")
+
+        # Firma + ejemplo de entrada
+        X_example = X_test.iloc[:5].copy()
+        signature = infer_signature(X_example, model.predict_proba(X_example)[:, 1])
+
+        # Evitar pip freeze lento
+        pip_reqs = [
+            f"scikit-learn=={sklearn.__version__}",
+            f"cloudpickle=={cloudpickle.__version__}",
+            "xgboost",
+            "numpy", "pandas", "matplotlib", "mlflow", "joblib"
+        ]
+
         try:
             mlflow.sklearn.log_model(
-                sk_model=clf, name="model",
-                input_example=X_example, signature=signature,
+                sk_model=model,
+                name="model",                     # MLflow nuevo
+                input_example=X_example,
+                signature=signature,
                 pip_requirements=pip_reqs
             )
         except TypeError:
             mlflow.sklearn.log_model(
-                sk_model=clf, artifact_path="model",
-                input_example=X_example, signature=signature,
+                sk_model=model,
+                artifact_path="model",            # compatibilidad
+                input_example=X_example,
+                signature=signature,
                 pip_requirements=pip_reqs
             )
 
-    print("\nActualizando lock de DVC si este script se ejecuta como stage...")
-    print("Hecho.")
+        print("\nRun MLflow completado.")
+
 
 if __name__ == "__main__":
-    p = argparse.ArgumentParser()
-    p.add_argument("--input-data", required=True)
-    p.add_argument("--model-output", default="models/xgboost_model.pkl")
-    p.add_argument("--fig-output",   default="reports/figures/training/confusion_matrix.png")
-    p.add_argument("--mlflow-experiment", default="fase1_modelado_equipo46")
-    args = p.parse_args()
+    args = parse_args()
     main(args)
+
