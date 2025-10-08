@@ -21,11 +21,11 @@ stages:
     outs:
     - reports/figures/eda
   train:
-    cmd: python src/modeling/train_xgb.py
+    cmd:  python src/modeling/train_xgb.py
       --input-data data/german_credit_modified_cleaned.csv
       --model-output models/xgboost_model.pkl
-      --fig-output reports/figures/training/confusion_matrix.png
-      --mlflow-experiment fase1_modelado_equipo46
+      --metrics-output reports/metrics.json            
+      --plots-output reports/figures/training          
     deps:
       - src/modeling/train_xgb.py
       - data/german_credit_modified_cleaned.csv
