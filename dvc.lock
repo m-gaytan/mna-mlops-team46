@@ -68,14 +68,14 @@ stages:
     outs:
     - path: models/xgboost_model.pkl
       hash: md5
-      md5: d6a5b0038fae654640fae59f89b0ae82
-      size: 282293
+      md5: 9e722650f45e78c2a2edcb7405e2a774
+      size: 282973
     - path: reports/figures/training
       hash: md5
-      md5: e56ca6048fa61ac8ecebb2b796aff6ba.dir
-      size: 25663
+      md5: 3387c4df4afabf57efaf2f8f63fe2a92.dir
+      size: 25377
       nfiles: 1
     - path: reports/metrics.json
       hash: md5
-      md5: ff67ac3dfa2f0698b69d1f971b84cbb5
+      md5: d1a52c71b3d03089791f1fb00f6c423c
       size: 317

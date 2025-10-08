@@ -7,7 +7,16 @@ set -e
 # Llama a 'dvc repro' para que DVC revise las dependencias (código, datos)
 # y vuelva a ejecutar la etapa de limpieza si algo cambió.
 echo "🚀 Reproduciendo el pipeline con 'dvc repro'..."
-dvc repro
+
+echo "Runner : $(whoami) @ $(hostname)"
+echo "Branch : $(git rev-parse --abbrev-ref HEAD)"
+echo "Commit : $(git rev-parse --short HEAD)"
+
+# (opcional) fija tracking local de MLflow para no mezclar:
+export MLFLOW_TRACKING_URI="file:$(pwd)/mlruns"
+export MLFLOW_EXPERIMENT_NAME="fase1_modelado_equipo46"
+
+dvc repro --force
 
 # --- PASO 2: Verificar si hubo cambios ---
 # Se revisa si el archivo 'dvc.yaml' fue modificado. Si 'dvc repro' generó
