@@ -2,7 +2,7 @@ stages:
   clean_data:
     cmd: python -m german_credit_ml.clean --config params.yaml
     deps:
-    #- data/raw/german_credit_modified.csv
+    - data/raw/german_credit_modified.csv
     - german_credit_ml/clean.py
     params:
     - data_load.processed
