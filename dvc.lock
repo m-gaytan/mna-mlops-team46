@@ -56,6 +56,7 @@ stages:
       hash: md5
       md5: 5f2d099f70ec601cada153c867466492
       size: 8029
+<<<<<<< HEAD
 =======
       md5: 792d634bbe6d58dfc7f37fa39f9d5f6c
       size: 4393
@@ -68,3 +69,18 @@ stages:
           model_output: models/xgboost_model.pkl
           metrics_output: reports/metrics.json
           plots_output: reports/figures/training
+=======
+    outs:
+    - path: models/xgboost_model.pkl
+      hash: md5
+      md5: 2a23a1142fa99fb8b9f697d06f6b3548
+      size: 281663
+    - path: reports/figures/training/confusion_matrix.png
+      hash: md5
+      md5: 731a0c7aa3d27004e9566dea5e8d1f59
+      size: 15813
+    - path: reports/metrics.json
+      hash: md5
+      md5: f7bd2c8520d49fc08522baf2f06cb21e
+      size: 223
+>>>>>>> 7922ee4a60aaf7054fa2c5baaf3628b2b22fce82
