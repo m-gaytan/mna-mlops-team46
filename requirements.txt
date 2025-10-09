@@ -5,6 +5,7 @@ aiohttp-retry==2.9.1
 aioitertools==0.12.0
 aiosignal==1.4.0
 alembic==1.16.5
+altair==5.5.0
 amqp==5.3.1
 annotated-types==0.7.0
 antlr4-python3-runtime==4.9.3
@@ -158,6 +159,7 @@ mlflow-skinny==3.4.0
 mlflow-tracing==3.4.0
 more-itertools==10.8.0
 multidict==6.7.0
+narwhals==2.7.0
 nbclient==0.10.2
 nbconvert==7.16.6
 nbformat==5.10.4
@@ -199,6 +201,7 @@ pycparser==2.23
 pydantic==2.11.10
 pydantic-settings==2.11.0
 pydantic_core==2.33.2
+pydeck==0.9.1
 pydot==4.0.1
 pygit2==1.18.2
 Pygments==2.19.2
@@ -254,11 +257,14 @@ sqltrie==0.11.2
 sse-starlette==3.0.2
 stack-data==0.6.3
 starlette==0.48.0
+streamlit==1.50.0
 tabulate==0.9.0
+tenacity==9.1.2
 terminado==0.18.1
 #threadpoolctl @ file:///C:/b/abs_3904pspv77/croot/threadpoolctl_1731006105881/work
 threadpoolctl>=3.2.0
 tinycss2==1.4.0
+toml==0.10.2
 tomlkit==0.13.3
 tornado==6.5.2
 tqdm==4.67.1
