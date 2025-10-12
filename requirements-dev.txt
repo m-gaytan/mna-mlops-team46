@@ -1,0 +1,24 @@
+# requirements-dev.txt
+
+# --- Core Data Science & ML ---
+pandas==2.3.3
+numpy==2.3.3
+scikit-learn==1.5.1 
+scipy==1.16.2
+xgboost==3.0.5
+shap==0.48.0
+joblib==1.5.2
+
+# --- MLOps Tools ---
+dvc[s3]==3.63.0
+mlflow==3.4.0
+PyYAML==6.0.3
+
+# --- App & Visualization ---
+streamlit==1.50.0
+matplotlib==3.10.6
+seaborn==0.13.2
+altair==5.5.0 # Streamlit puede necesitarlo
+
+# --- Otras dependencias necesarias ---
+pyarrow==21.0.0
