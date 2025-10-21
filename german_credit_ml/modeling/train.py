@@ -92,6 +92,7 @@ def train_model(input_data: Path, model_output: Path, metrics_output: Path, plot
             ("clf", xgb_clf)
         ])
         
+        
         #model = xgb.XGBClassifier(**fixed_params)
         model.fit(X_train, y_train)
         print("[SUCCESS] Modelo entrenado.")
