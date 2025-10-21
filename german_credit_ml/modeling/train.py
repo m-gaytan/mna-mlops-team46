@@ -87,13 +87,13 @@ def train_model(input_data: Path, model_output: Path, metrics_output: Path, plot
         xgb_clf = xgb.XGBClassifier(**fixed_params)
 
         # Pipeline total: preprocesamiento + clasificador
-        model = Pipeline(steps=[
-            ("preprocessor", preprocessor),
-            ("clf", xgb_clf)
-        ])
+        #model = Pipeline(steps=[
+           # ("preprocessor", preprocessor),
+           # ("clf", xgb_clf)
+        #])
+
         
-        
-        #model = xgb.XGBClassifier(**fixed_params)
+        model = xgb.XGBClassifier(**fixed_params)
         model.fit(X_train, y_train)
         print("[SUCCESS] Modelo entrenado.")
         
