@@ -18,6 +18,10 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix, roc_curve, roc_auc_score
 import shap
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import OneHotEncoder
 
 # Ignorar advertencias futuras para una salida más limpia en la consola
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -53,6 +57,23 @@ def train_model(input_data: Path, model_output: Path, metrics_output: Path, plot
             stratify=y
         )
         print("[SUCCESS] Datos divididos en conjuntos de entrenamiento y prueba.")
+
+        num_cols = X_train.select_dtypes(include=["number"]).columns.tolist()
+        cat_cols = [c for c in X_train.columns if c not in num_cols]
+
+        num_transformer = SimpleImputer(strategy="median")  # XGB no requiere escalar
+        cat_transformer = Pipeline(steps=[
+            ("imputer", SimpleImputer(strategy="most_frequent")),
+            ("ohe", OneHotEncoder(handle_unknown="ignore", sparse_output=False))
+        ])
+
+        preprocessor = ColumnTransformer(
+            transformers=[
+                ("num", num_transformer, num_cols),
+                ("cat", cat_transformer, cat_cols),
+            ],
+            remainder="drop"
+        )
         
         # --- PASO 2: Entrenamiento del Modelo ---
         print("\n[INFO] PASO 2: Entrenando el modelo XGBoost...")
@@ -62,8 +83,16 @@ def train_model(input_data: Path, model_output: Path, metrics_output: Path, plot
             'eval_metric': 'logloss',
             'random_state': params.get('random_state', 42)
         }
+
+        xgb_clf = xgb.XGBClassifier(**fixed_params)
+
+        # Pipeline total: preprocesamiento + clasificador
+        model = Pipeline(steps=[
+            ("preprocessor", preprocessor),
+            ("clf", xgb_clf)
+        ])
         
-        model = xgb.XGBClassifier(**fixed_params)
+        #model = xgb.XGBClassifier(**fixed_params)
         model.fit(X_train, y_train)
         print("[SUCCESS] Modelo entrenado.")
         
