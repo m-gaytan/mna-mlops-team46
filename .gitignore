@@ -1,5 +1,5 @@
 # Data
-/data/**
+
 # exceptions so DVC metafiles are tracked
 !/data/*.dvc
 !/data/**/*.dvc
