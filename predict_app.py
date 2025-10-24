@@ -77,7 +77,7 @@ def simulate_prediction(data):
 # ==================== DIE ANWENDUNG (La Aplicación) ====================
 
 st.title("🇩🇪 ¡Achtung! Análisis de Riesgo Crediticio")
-st.markdown("Wilkommen! Gracias por elejir nuestro banco. Nos complace evaluar su solicitud de crédito con la máxima eficiencia.")
+st.markdown("Wilkommen! Gracias por elegir nuestro banco. Nos complace evaluar su solicitud de crédito con la máxima eficiencia.")
 st.markdown("---")
 
 # --- Sidebar (Panel de Kontrol) ---
