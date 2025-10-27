@@ -1,4 +1,4 @@
-# german_credit_ml/modeling/train.py
+# german_credit_ml/modeling/train2.py
 
 import argparse
 import json
@@ -22,6 +22,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import OneHotEncoder
+import mlflow.sklearn
 
 # Ignorar advertencias futuras para una salida más limpia en la consola
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -37,6 +38,9 @@ def train_model(input_data: Path, model_output: Path, metrics_output: Path, plot
 
     # Iniciar un "Run" de MLflow para registrar todo en un solo experimento
     with mlflow.start_run(run_name=run_name):
+
+        print("TRACKING_URI:", mlflow.get_tracking_uri())
+        print("ARTIFACT_URI:", mlflow.get_artifact_uri())
         
         print("\n" + "="*50)
         print(f" Iniciando Run: {run_name} ".center(50, "="))
@@ -86,14 +90,14 @@ def train_model(input_data: Path, model_output: Path, metrics_output: Path, plot
 
         xgb_clf = xgb.XGBClassifier(**fixed_params)
 
-        # Pipeline total: preprocesamiento + clasificador
-        #model = Pipeline(steps=[
-           # ("preprocessor", preprocessor),
-           # ("clf", xgb_clf)
-        #])
+        #Pipeline total: preprocesamiento + clasificador
+        model = Pipeline(steps=[
+           ("preprocessor", preprocessor),
+           ("clf", xgb_clf)
+        ])
 
         
-        model = xgb.XGBClassifier(**fixed_params)
+        #model = xgb.XGBClassifier(**fixed_params)
         model.fit(X_train, y_train)
         print("[SUCCESS] Modelo entrenado.")
         
@@ -133,45 +137,124 @@ def train_model(input_data: Path, model_output: Path, metrics_output: Path, plot
         plt.savefig(roc_curve_path); plt.close();
         print(f"[SUCCESS] Gráficas de evaluación guardadas en: {plots_output}")
 
-        # --- PASO 5: Análisis de Interpretabilidad con SHAP ---
+        # --- PASO 5: SHAP (sobre features transformadas) ---
         print("\n[INFO] PASO 5: Realizando análisis SHAP...")
-        explainer = shap.TreeExplainer(model)
-        shap_values = explainer.shap_values(X_test)
-        
+
+        # 1) Toma el preprocesador y el clasificador desde el Pipeline
+        fitted_pre = model.named_steps["preprocessor"]
+        fitted_clf = model.named_steps["clf"]
+
+        # 2) Transforma X_test y obtiene nombres de columnas ya expandidas (OHE)
+        X_test_proc = fitted_pre.transform(X_test)
+        try:
+            feature_names = fitted_pre.get_feature_names_out()
+        except Exception:
+            feature_names = [f"f{i}" for i in range(X_test_proc.shape[1])]
+
+        X_test_proc_df = pd.DataFrame(X_test_proc, columns=feature_names)
+
+        # 3) Crea el explainer para el CLASIFICADOR (no el pipeline)
+        try:
+            explainer = shap.TreeExplainer(fitted_clf)
+            shap_values = explainer.shap_values(X_test_proc)
+        except Exception:
+            # Compatibilidad con versiones nuevas de SHAP
+            explainer = shap.Explainer(fitted_clf)
+            shap_values = explainer(X_test_proc).values
+
+        # 4) Si SHAP devuelve lista (multiclase), usa la clase positiva
+        if isinstance(shap_values, list):
+            # asume binario y toma la clase 1
+            shap_values_cls1 = shap_values[1]
+        else:
+            shap_values_cls1 = shap_values
+
         print("  -> Top 10 features más importantes (SHAP):")
-        feature_names = X_test.columns
-        shap_df = pd.DataFrame(shap_values, columns=feature_names)
+        shap_df = pd.DataFrame(shap_values_cls1, columns=feature_names)
         vals = np.abs(shap_df.values).mean(0)
-        shap_importance = pd.DataFrame(list(zip(feature_names, vals)), columns=['feature', 'importance']).sort_values(by=['importance'], ascending=False)
+        shap_importance = pd.DataFrame(
+            list(zip(feature_names, vals)),
+            columns=['feature', 'importance']
+        ).sort_values(by='importance', ascending=False)
         print(shap_importance.head(10).to_string(index=False))
 
-        shap.summary_plot(shap_values, X_test, plot_type="bar", show=False)
-        plt.title("Importancia de Features (Valor SHAP Absoluto Medio)"); plt.tight_layout();
+        # 5) Plots
+        shap.summary_plot(shap_values_cls1, X_test_proc_df, plot_type="bar", show=False)
+        plt.title("Importancia de Features (SHAP | media abs)")
+        plt.tight_layout()
         shap_importance_path = plots_output / "shap_importance_plot.png"
-        plt.savefig(shap_importance_path); plt.close();
+        plt.savefig(shap_importance_path); plt.close()
 
-        shap.summary_plot(shap_values, X_test, show=False)
-        plt.tight_layout();
+        shap.summary_plot(shap_values_cls1, X_test_proc_df, show=False)
+        plt.tight_layout()
         shap_summary_path = plots_output / "shap_summary_plot.png"
-        plt.savefig(shap_summary_path); plt.close();
-        print(f"[SUCCESS] Gráficas SHAP guardadas en: {plots_output}")
+        plt.savefig(shap_summary_path); plt.close()
+        print(f"[SUCCESS] SHAP plots guardados en: {plots_output}")
+
+
+       ## --- PASO 5: Análisis de Interpretabilidad con SHAP ---
+       #print("\n[INFO] PASO 5: Realizando análisis SHAP...")
+       #explainer = shap.TreeExplainer(model)
+       #shap_values = explainer.shap_values(X_test)
+       #
+       #print("  -> Top 10 features más importantes (SHAP):")
+       #feature_names = X_test.columns
+       #shap_df = pd.DataFrame(shap_values, columns=feature_names)
+       #vals = np.abs(shap_df.values).mean(0)
+       #shap_importance = pd.DataFrame(list(zip(feature_names, vals)), columns=['feature', 'importance']).sort_values(by=['importance'], ascending=False)
+       #print(shap_importance.head(10).to_string(index=False))
+
+       #shap.summary_plot(shap_values, X_test, plot_type="bar", show=False)
+       #plt.title("Importancia de Features (Valor SHAP Absoluto Medio)"); plt.tight_layout();
+       #shap_importance_path = plots_output / "shap_importance_plot.png"
+       #plt.savefig(shap_importance_path); plt.close();
+
+       #shap.summary_plot(shap_values, X_test, show=False)
+       #plt.tight_layout();
+       #shap_summary_path = plots_output / "shap_summary_plot.png"
+       #plt.savefig(shap_summary_path); plt.close();
+       #print(f"[SUCCESS] Gráficas SHAP guardadas en: {plots_output}")
         
         # --- PASO 6: Registro en MLflow y Guardado para DVC ---
         print("\n[INFO] PASO 6: Registrando artefactos y métricas...")
-        mlflow.log_params(model.get_params())
-        mlflow.log_metrics({'f1_score_test': f1, 'accuracy_test': accuracy, 'auc_test': auc, 'bad_rate_test': bad_rate})
-        mlflow.xgboost.log_model(model, "xgboost-model")
+
+        # Params del clasificador real que usa el pipeline
+        mlflow.log_params(fitted_clf.get_params())
+
+        # Métricas
+        mlflow.log_metrics({
+            'f1_score_test': f1,
+            'accuracy_test': accuracy,
+            'auc_test': auc,
+            'bad_rate_test': bad_rate
+        })
+
+        # Log del PIPELINE completo (prepro + xgb) en MLflow
+        mlflow.sklearn.log_model(sk_model=model, artifact_path="sklearn-pipeline")
+        # Log SOLO del XGBoost entrenado
+        mlflow.xgboost.log_model(xgb_model=fitted_clf, artifact_path="xgboost-model")
+
+        # Plots como artefactos
         mlflow.log_artifact(confusion_matrix_path, "plots")
         mlflow.log_artifact(roc_curve_path, "plots")
         mlflow.log_artifact(shap_importance_path, "plots")
         mlflow.log_artifact(shap_summary_path, "plots")
-        
+
+        # Guardar pipeline a disco (para DVC/serving)
         with open(model_output, 'wb') as f:
             pickle.dump(model, f)
-        
-        metrics = {'f1_score_test': f1, 'accuracy_test': accuracy, 'auc_test': auc, 'bad_rate_test': bad_rate, 'params': model.get_params()}
+
+        # Guardar métricas a JSON (DVC-friendly)
+        metrics = {
+            'f1_score_test': f1,
+            'accuracy_test': accuracy,
+            'auc_test': auc,
+            'pred_bad_rate_test': bad_rate,
+            'params': fitted_clf.get_params()
+        }
         with open(metrics_output, 'w') as f:
             json.dump(metrics, f, indent=4, default=str)
+
         print("[SUCCESS] Modelo, métricas y gráficas registradas y guardadas.")
 
 
