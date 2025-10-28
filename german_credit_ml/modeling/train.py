@@ -1,279 +1,279 @@
-# german_credit_ml/modeling/train2.py
-
-import argparse
-import json
+from __future__ import annotations
+import argparse, json, pickle, warnings, datetime
+from dataclasses import dataclass
 from pathlib import Path
-import warnings
-import pickle
-import datetime
+from typing import Dict, List, Tuple
 
-# Importaciones de ML, visualización e interpretabilidad
-import mlflow
-import mlflow.xgboost
-import pandas as pd
+import mlflow, mlflow.sklearn, mlflow.xgboost
 import numpy as np
+import pandas as pd
 import xgboost as xgb
+import shap
 import seaborn as sns
 import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, confusion_matrix, roc_curve, roc_auc_score
-import shap
-from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
+from sklearn.metrics import classification_report, confusion_matrix, roc_curve, roc_auc_score
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
-import mlflow.sklearn
 
-# Ignorar advertencias futuras para una salida más limpia en la consola
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-def train_model(input_data: Path, model_output: Path, metrics_output: Path, plots_output: Path, params: dict):
-    """
-    Función completa para entrenar, evaluar y registrar un modelo XGBoost.
-    """
-    # Configurar y nombrar el experimento en MLflow
-    mlflow.set_experiment("German Credit XGBoost")
-    now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    run_name = f"run_{now}"
 
-    # Iniciar un "Run" de MLflow para registrar todo en un solo experimento
-    with mlflow.start_run(run_name=run_name):
+@dataclass(frozen=True)
+class Paths:
+    input_data: Path
+    model_output: Path
+    metrics_output: Path
+    plots_output: Path
 
-        print("TRACKING_URI:", mlflow.get_tracking_uri())
-        print("ARTIFACT_URI:", mlflow.get_artifact_uri())
-        
-        print("\n" + "="*50)
-        print(f" Iniciando Run: {run_name} ".center(50, "="))
-        print("="*50)
 
-        # --- PASO 1: Carga y Preparación de Datos ---
-        print("\n[INFO] PASO 1: Cargando y preparando datos...")
-        df = pd.read_csv(input_data)
-        
-        X = df.drop(columns='credit_risk')
-        y = df['credit_risk']
-        X = pd.get_dummies(X, drop_first=True)
-        
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y,
-            test_size=params.get('test_size', 0.2),
-            random_state=params.get('random_state', 42),
-            stratify=y
+@dataclass(frozen=True)
+class TrainConfig:
+    test_size: float = 0.2
+    random_state: int = 42
+    xgb_params: Dict = None
+    experiment_name: str = "German Credit XGBoost"
+
+    def xgb(self) -> Dict:
+        base = dict(
+            n_estimators=150, max_depth=5, learning_rate=0.1,
+            subsample=0.8, colsample_bytree=0.8,
+            eval_metric="logloss", random_state=self.random_state
         )
-        print("[SUCCESS] Datos divididos en conjuntos de entrenamiento y prueba.")
+        if self.xgb_params:
+            base.update(self.xgb_params)
+        return base
 
+
+class DataModule:
+    def __init__(self, csv_path: Path, target: str = "credit_risk"):
+        self.csv_path = csv_path
+        self.target = target
+        self._train = self._test = None
+
+    def load(self) -> Tuple[pd.DataFrame, pd.Series]:
+        df = pd.read_csv(self.csv_path)
+        X, y = df.drop(columns=self.target), df[self.target]
+        return X, y
+
+    def split(self, X: pd.DataFrame, y: pd.Series, cfg: TrainConfig):
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
+            X, y, test_size=cfg.test_size, random_state=cfg.random_state, stratify=y
+        )
+        return self.X_train, self.X_test, self.y_train, self.y_test
+
+
+class PreprocessorFactory:
+    @staticmethod
+    def build(X_train: pd.DataFrame) -> ColumnTransformer:
         num_cols = X_train.select_dtypes(include=["number"]).columns.tolist()
         cat_cols = [c for c in X_train.columns if c not in num_cols]
 
-        num_transformer = SimpleImputer(strategy="median")  # XGB no requiere escalar
-        cat_transformer = Pipeline(steps=[
+        num = SimpleImputer(strategy="median")
+        cat = Pipeline(steps=[
             ("imputer", SimpleImputer(strategy="most_frequent")),
             ("ohe", OneHotEncoder(handle_unknown="ignore", sparse_output=False))
         ])
 
-        preprocessor = ColumnTransformer(
-            transformers=[
-                ("num", num_transformer, num_cols),
-                ("cat", cat_transformer, cat_cols),
-            ],
+        return ColumnTransformer(
+            transformers=[("num", num, num_cols), ("cat", cat, cat_cols)],
             remainder="drop"
         )
-        
-        # --- PASO 2: Entrenamiento del Modelo ---
-        print("\n[INFO] PASO 2: Entrenando el modelo XGBoost...")
-        fixed_params = {
-            'n_estimators': 150, 'max_depth': 5, 'learning_rate': 0.1,
-            'subsample': 0.8, 'colsample_bytree': 0.8,
-            'eval_metric': 'logloss',
-            'random_state': params.get('random_state', 42)
+
+
+class Evaluator:
+    @staticmethod
+    def compute_metrics(y_true, y_pred, y_proba) -> Dict[str, float]:
+        report = classification_report(y_true, y_pred, output_dict=True)
+        return {
+            "f1_score_test": report["1"]["f1-score"],
+            "accuracy_test": report["accuracy"],
+            "auc_test": roc_auc_score(y_true, y_proba),
+            "bad_rate_test": float(np.mean(y_pred == 0)),
         }
 
-        xgb_clf = xgb.XGBClassifier(**fixed_params)
+    @staticmethod
+    def plot_confusion_matrix(y_true, y_pred, outpath: Path):
+        cm = confusion_matrix(y_true, y_pred)
+        plt.figure(figsize=(8, 6))
+        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
+                    xticklabels=["Malo", "Bueno"], yticklabels=["Malo", "Bueno"])
+        plt.title("Matriz de Confusión"); plt.ylabel("Verdadero"); plt.xlabel("Predicho")
+        outpath.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(outpath); plt.close()
 
-        #Pipeline total: preprocesamiento + clasificador
-        model = Pipeline(steps=[
-           ("preprocessor", preprocessor),
-           ("clf", xgb_clf)
-        ])
+    @staticmethod
+    def plot_roc(y_true, y_proba, outpath: Path, auc_val: float):
+        fpr, tpr, _ = roc_curve(y_true, y_proba)
+        plt.figure(figsize=(8, 6))
+        plt.plot(fpr, tpr, lw=2, label=f"ROC (AUC={auc_val:.2f})")
+        plt.plot([0, 1], [0, 1], lw=2, linestyle="--")
+        plt.xlabel("FPR"); plt.ylabel("TPR"); plt.title("Curva ROC"); plt.legend(loc="lower right")
+        outpath.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(outpath); plt.close()
 
-        
-        #model = xgb.XGBClassifier(**fixed_params)
-        model.fit(X_train, y_train)
-        print("[SUCCESS] Modelo entrenado.")
-        
-        # --- PASO 3: Evaluación del Modelo ---
-        print("\n[INFO] PASO 3: Evaluando el modelo...")
-        y_pred = model.predict(X_test)
-        y_pred_proba = model.predict_proba(X_test)[:, 1]
 
-        report = classification_report(y_test, y_pred, output_dict=True)
-        f1 = report['1']['f1-score']
-        accuracy = report['accuracy']
-        auc = roc_auc_score(y_test, y_pred_proba)
-        bad_rate = np.mean(y_pred == 0)
+class ShapInterpreter:
+    @staticmethod
+    def explain(pipeline: Pipeline, X_test: pd.DataFrame, plots_dir: Path):
+        pre = pipeline.named_steps["preprocessor"]
+        clf = pipeline.named_steps["clf"]
 
-        print(f"  -> F1-Score: {f1:.4f}")
-        print(f"  -> Accuracy: {accuracy:.4f}")
-        print(f"  -> AUC: {auc:.4f}")
-        print(f"  -> Bad Rate: {bad_rate:.4f}")
-
-        # --- PASO 4: Generación de Gráficas de Evaluación ---
-        print("\n[INFO] PASO 4: Generando gráficas de evaluación...")
-        plots_output.mkdir(parents=True, exist_ok=True)
-        
-        # Matriz de Confusión
-        cm = confusion_matrix(y_test, y_pred)
-        plt.figure(figsize=(8, 6)); sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=['Malo', 'Bueno'], yticklabels=['Malo', 'Bueno']);
-        plt.title('Matriz de Confusión'); plt.ylabel('Verdadero'); plt.xlabel('Predicho');
-        confusion_matrix_path = plots_output / "confusion_matrix.png"
-        plt.savefig(confusion_matrix_path); plt.close();
-        
-        # Curva ROC
-        fpr, tpr, _ = roc_curve(y_test, y_pred_proba)
-        plt.figure(figsize=(8, 6)); plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'Curva ROC (AUC = {auc:.2f})');
-        plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--');
-        plt.xlabel('Tasa de Falsos Positivos'); plt.ylabel('Tasa de Verdaderos Positivos'); plt.title('Curva ROC'); plt.legend(loc="lower right");
-        roc_curve_path = plots_output / "roc_curve.png"
-        plt.savefig(roc_curve_path); plt.close();
-        print(f"[SUCCESS] Gráficas de evaluación guardadas en: {plots_output}")
-
-        # --- PASO 5: SHAP (sobre features transformadas) ---
-        print("\n[INFO] PASO 5: Realizando análisis SHAP...")
-
-        # 1) Toma el preprocesador y el clasificador desde el Pipeline
-        fitted_pre = model.named_steps["preprocessor"]
-        fitted_clf = model.named_steps["clf"]
-
-        # 2) Transforma X_test y obtiene nombres de columnas ya expandidas (OHE)
-        X_test_proc = fitted_pre.transform(X_test)
+        X_proc = pre.transform(X_test)
         try:
-            feature_names = fitted_pre.get_feature_names_out()
+            feature_names = pre.get_feature_names_out()
         except Exception:
-            feature_names = [f"f{i}" for i in range(X_test_proc.shape[1])]
+            feature_names = [f"f{i}" for i in range(X_proc.shape[1])]
+        X_proc_df = pd.DataFrame(X_proc, columns=feature_names)
 
-        X_test_proc_df = pd.DataFrame(X_test_proc, columns=feature_names)
-
-        # 3) Crea el explainer para el CLASIFICADOR (no el pipeline)
         try:
-            explainer = shap.TreeExplainer(fitted_clf)
-            shap_values = explainer.shap_values(X_test_proc)
+            explainer = shap.TreeExplainer(clf)
+            shap_values = explainer.shap_values(X_proc)
         except Exception:
-            # Compatibilidad con versiones nuevas de SHAP
-            explainer = shap.Explainer(fitted_clf)
-            shap_values = explainer(X_test_proc).values
+            explainer = shap.Explainer(clf)
+            shap_values = explainer(X_proc).values
 
-        # 4) Si SHAP devuelve lista (multiclase), usa la clase positiva
         if isinstance(shap_values, list):
-            # asume binario y toma la clase 1
-            shap_values_cls1 = shap_values[1]
-        else:
-            shap_values_cls1 = shap_values
+            shap_values = shap_values[1]
 
-        print("  -> Top 10 features más importantes (SHAP):")
-        shap_df = pd.DataFrame(shap_values_cls1, columns=feature_names)
+        # Importancia media absoluta
+        shap_df = pd.DataFrame(shap_values, columns=feature_names)
         vals = np.abs(shap_df.values).mean(0)
-        shap_importance = pd.DataFrame(
-            list(zip(feature_names, vals)),
-            columns=['feature', 'importance']
-        ).sort_values(by='importance', ascending=False)
-        print(shap_importance.head(10).to_string(index=False))
+        shap_importance = (
+            pd.DataFrame({"feature": feature_names, "importance": vals})
+            .sort_values("importance", ascending=False)
+        )
 
-        # 5) Plots
-        shap.summary_plot(shap_values_cls1, X_test_proc_df, plot_type="bar", show=False)
-        plt.title("Importancia de Features (SHAP | media abs)")
-        plt.tight_layout()
-        shap_importance_path = plots_output / "shap_importance_plot.png"
-        plt.savefig(shap_importance_path); plt.close()
+        # Plots
+        bar_path = plots_dir / "shap_importance_plot.png"
+        shap.summary_plot(shap_values, X_proc_df, plot_type="bar", show=False)
+        plt.title("Importancia de Features (SHAP | media abs)"); plt.tight_layout()
+        bar_path.parent.mkdir(parents=True, exist_ok=True); plt.savefig(bar_path); plt.close()
 
-        shap.summary_plot(shap_values_cls1, X_test_proc_df, show=False)
-        plt.tight_layout()
-        shap_summary_path = plots_output / "shap_summary_plot.png"
-        plt.savefig(shap_summary_path); plt.close()
-        print(f"[SUCCESS] SHAP plots guardados en: {plots_output}")
+        swarm_path = plots_dir / "shap_summary_plot.png"
+        shap.summary_plot(shap_values, X_proc_df, show=False)
+        plt.tight_layout(); plt.savefig(swarm_path); plt.close()
+
+        return [bar_path, swarm_path], shap_importance
+
+class MlflowLogger:
+    def __init__(self, experiment_name: str):
+        self.experiment_name = experiment_name
+        mlflow.set_experiment(experiment_name)
+
+    def start_run(self) -> None:
+        now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        self.run = mlflow.start_run(run_name=f"run_{now}")
+        print("TRACKING_URI:", mlflow.get_tracking_uri())
+        print("ARTIFACT_URI:", mlflow.get_artifact_uri())
+
+    def log_params_metrics(self, model: Pipeline, metrics: Dict[str, float]):
+        clf = model.named_steps["clf"]
+        mlflow.log_params(clf.get_params())
+        mlflow.log_metrics(metrics)
+
+    def log_models(self, model: Pipeline):
+        clf = model.named_steps["clf"]
+        mlflow.sklearn.log_model(model, artifact_path="sklearn-pipeline")
+        mlflow.xgboost.log_model(clf, artifact_path="xgboost-model")
+
+    def log_artifacts(self, artifact_paths: List[Path], subdir: str = "plots"):
+        for p in artifact_paths:
+            mlflow.log_artifact(str(p), subdir)
+
+    def end_run(self):
+        mlflow.end_run()
 
 
-       ## --- PASO 5: Análisis de Interpretabilidad con SHAP ---
-       #print("\n[INFO] PASO 5: Realizando análisis SHAP...")
-       #explainer = shap.TreeExplainer(model)
-       #shap_values = explainer.shap_values(X_test)
-       #
-       #print("  -> Top 10 features más importantes (SHAP):")
-       #feature_names = X_test.columns
-       #shap_df = pd.DataFrame(shap_values, columns=feature_names)
-       #vals = np.abs(shap_df.values).mean(0)
-       #shap_importance = pd.DataFrame(list(zip(feature_names, vals)), columns=['feature', 'importance']).sort_values(by=['importance'], ascending=False)
-       #print(shap_importance.head(10).to_string(index=False))
+class Trainer:
+    def __init__(self, paths: Paths, cfg: TrainConfig):
+        self.paths = paths
+        self.cfg = cfg
+        self.mlflog = MlflowLogger(cfg.experiment_name)
 
-       #shap.summary_plot(shap_values, X_test, plot_type="bar", show=False)
-       #plt.title("Importancia de Features (Valor SHAP Absoluto Medio)"); plt.tight_layout();
-       #shap_importance_path = plots_output / "shap_importance_plot.png"
-       #plt.savefig(shap_importance_path); plt.close();
+    def build_model(self, pre: ColumnTransformer) -> Pipeline:
+        xgb_clf = xgb.XGBClassifier(**self.cfg.xgb())
+        return Pipeline(steps=[("preprocessor", pre), ("clf", xgb_clf)])
 
-       #shap.summary_plot(shap_values, X_test, show=False)
-       #plt.tight_layout();
-       #shap_summary_path = plots_output / "shap_summary_plot.png"
-       #plt.savefig(shap_summary_path); plt.close();
-       #print(f"[SUCCESS] Gráficas SHAP guardadas en: {plots_output}")
-        
-        # --- PASO 6: Registro en MLflow y Guardado para DVC ---
-        print("\n[INFO] PASO 6: Registrando artefactos y métricas...")
+    def run(self):
+        self.mlflog.start_run()
+        print("\n[INFO] Cargando datos…")
+        data = DataModule(self.paths.input_data)
+        X, y = data.load()
+        X_tr, X_te, y_tr, y_te = data.split(X, y, self.cfg)
 
-        # Params del clasificador real que usa el pipeline
-        mlflow.log_params(fitted_clf.get_params())
+        print("[INFO] Construyendo preprocesamiento…")
+        pre = PreprocessorFactory.build(X_tr)
 
-        # Métricas
-        mlflow.log_metrics({
-            'f1_score_test': f1,
-            'accuracy_test': accuracy,
-            'auc_test': auc,
-            'bad_rate_test': bad_rate
-        })
+        print("[INFO] Entrenando modelo…")
+        model = self.build_model(pre)
+        model.fit(X_tr, y_tr)
 
-        # Log del PIPELINE completo (prepro + xgb) en MLflow
-        mlflow.sklearn.log_model(sk_model=model, artifact_path="sklearn-pipeline")
-        # Log SOLO del XGBoost entrenado
-        mlflow.xgboost.log_model(xgb_model=fitted_clf, artifact_path="xgboost-model")
+        print("[INFO] Evaluando…")
+        y_pred = model.predict(X_te)
+        y_proba = model.predict_proba(X_te)[:, 1]
+        metrics = Evaluator.compute_metrics(y_te, y_pred, y_proba)
+        for k, v in metrics.items():
+            print(f"  -> {k}: {v:.4f}")
 
-        # Plots como artefactos
-        mlflow.log_artifact(confusion_matrix_path, "plots")
-        mlflow.log_artifact(roc_curve_path, "plots")
-        mlflow.log_artifact(shap_importance_path, "plots")
-        mlflow.log_artifact(shap_summary_path, "plots")
+        print("[INFO] Graficando…")
+        plots_dir = self.paths.plots_output
+        cm_path = plots_dir / "confusion_matrix.png"
+        roc_path = plots_dir / "roc_curve.png"
+        Evaluator.plot_confusion_matrix(y_te, y_pred, cm_path)
+        Evaluator.plot_roc(y_te, y_proba, roc_path, metrics["auc_test"])
 
-        # Guardar pipeline a disco (para DVC/serving)
-        with open(model_output, 'wb') as f:
+        print("[INFO] SHAP…")
+        shap_paths, shap_importance = ShapInterpreter.explain(model, X_te, plots_dir)
+
+        TOP_N = 10
+        print(f"\n  -> Top {TOP_N} features más importantes (SHAP | media abs):")
+        print(shap_importance.head(TOP_N).to_string(index=False))
+
+        # (opcional) guardarlo/loguearlo
+        (shap_importance.head(TOP_N)
+        .to_csv(plots_dir / "shap_top_features.csv", index=False))
+        self.mlflog.log_artifacts([plots_dir / "shap_top_features.csv"], subdir="plots")
+        try:
+            mlflow.log_text(shap_importance.head(TOP_N).to_string(index=False),
+                            "plots/shap_top_features.txt")
+        except Exception:
+            pass
+
+
+        print("[INFO] Guardando artefactos locales…")
+        with open(self.paths.model_output, "wb") as f:
             pickle.dump(model, f)
+        with open(self.paths.metrics_output, "w") as f:
+            json.dump({**metrics, "params": model.named_steps["clf"].get_params()},
+                      f, indent=4, default=str)
 
-        # Guardar métricas a JSON (DVC-friendly)
-        metrics = {
-            'f1_score_test': f1,
-            'accuracy_test': accuracy,
-            'auc_test': auc,
-            'pred_bad_rate_test': bad_rate,
-            'params': fitted_clf.get_params()
-        }
-        with open(metrics_output, 'w') as f:
-            json.dump(metrics, f, indent=4, default=str)
-
-        print("[SUCCESS] Modelo, métricas y gráficas registradas y guardadas.")
+        print("[INFO] Registrando en MLflow…")
+        self.mlflog.log_params_metrics(model, metrics)
+        self.mlflog.log_models(model)
+        self.mlflog.log_artifacts([cm_path, roc_path] + shap_paths, subdir="plots")
+        self.mlflog.end_run()
+        print("[SUCCESS] Entrenamiento finalizado.")
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Script completo para entrenar un modelo XGBoost.")
-    parser.add_argument("--input-data", type=str, required=True)
-    parser.add_argument("--model-output", type=str, required=True)
-    parser.add_argument("--metrics-output", type=str, required=True)
-    parser.add_argument("--plots-output", type=str, required=True)
-    
-    args = parser.parse_args()
-    
-    # Parámetros generales del pipeline que DVC leerá de params.yaml
-    train_params = {'test_size': 0.2, 'random_state': 42}
-    
-    train_model(
-        input_data=Path(args.input_data),
-        model_output=Path(args.model_output),
-        metrics_output=Path(args.metrics_output),
-        plots_output=Path(args.plots_output),
-        params=train_params
+def parse_args():
+    p = argparse.ArgumentParser(description="Entrena modelo XGBoost (OOP).")
+    p.add_argument("--input-data", required=True, type=Path)
+    p.add_argument("--model-output", required=True, type=Path)
+    p.add_argument("--metrics-output", required=True, type=Path)
+    p.add_argument("--plots-output", required=True, type=Path)
+    return p.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    paths = Paths(
+        input_data=args.input_data,
+        model_output=args.model_output,
+        metrics_output=args.metrics_output,
+        plots_output=args.plots_output
     )
+    cfg = TrainConfig(test_size=0.2, random_state=42)
+    Trainer(paths, cfg).run()
