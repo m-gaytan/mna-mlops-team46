@@ -118,3 +118,40 @@ con el objetivo de predecir el riesgo crediticio de clientes a partir de datos h
 
 ## 📜 Licencia
 Este proyecto está bajo la licencia MIT. Ver archivo [LICENSE](LICENSE) para más detalles.
+
+
+## OOP
+
+# Credit Risk MLOps (scaffold)
+
+Estructura modular con MLflow + DVC lista para integrar el `3_modelado.ipynb`.
+
+## Requisitos
+- Python 3.10+
+- `pip install -e .` (dentro del directorio del proyecto)
+
+## Ejecución
+1) (Opcional) MLflow tracking server:
+```
+mlflow server --host 127.0.0.1 --port 5000
+```
+edita `params.yaml` → `mlflow.tracking_uri` si lo usas.
+
+2) Entrenamiento:
+```
+python -m scripts.train run --params_path params.yaml
+```
+o con DVC:
+```
+dvc repro
+```
+
+## Mapeo Notebook → Módulos
+- Carga/partición: `src/credit_risk/data.py`
+- Transformaciones: `src/credit_risk/features.py`
+- Modelado/búsqueda: `src/credit_risk/modeling.py`
+- Métricas: `src/credit_risk/metrics.py`
+- Figuras: `src/credit_risk/viz.py`
+- Orquestación + MLflow: `src/credit_risk/pipeline.py`
+- CLI: `scripts/train.py`
+

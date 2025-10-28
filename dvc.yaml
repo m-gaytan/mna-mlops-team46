@@ -21,18 +21,44 @@ stages:
     outs:
     - reports/figures/eda
   train:
-    cmd:  python src/modeling/train_xgb.py
-      --input-data data/german_credit_modified_cleaned.csv
-      --model-output models/xgboost_model.pkl
-      --metrics-output reports/metrics.json            
-      --plots-output reports/figures/training          
+
+    #OOP
+
+    cmd: python -m scripts.train run --params_path params.yaml
     deps:
-      - src/modeling/train_xgb.py
-      - data/german_credit_modified_cleaned.csv
+      - scripts/train.py
+      - src/credit_risk
+      - params.yaml
+      - ${data.path}
+    params:
+      - data.test_size
+      - data.random_state
+      - model.type
+      - model.class_weight
+      - tuning.cv
+      - tuning.param_grid.n_estimators
+      - tuning.param_grid.max_depth
+      - tuning.param_grid.min_samples_split
+      - tuning.param_grid.min_samples_leaf
     outs:
       - models/xgboost_model.pkl
     plots:
       - reports/figures/training/confusion_matrix.png
+    
+    #cmd:  python src/modeling/train_xgb.py
+    #  --input-data data/german_credit_modified_cleaned.csv
+    #  --model-output models/xgboost_model.pkl
+    #  --metrics-output reports/metrics.json            
+    #  --plots-output reports/figures/training          
+    #deps:
+    # - src/modeling/train_xgb.py
+    #  - data/german_credit_modified_cleaned.csv
+    #    outs:
+    #  - artifacts: {}  
+
+
+
+    
     #cmd: python -m german_credit_ml.modeling.train --input-data 
     #  data/processed/german_credit_clean.csv --model-output 
     #  models/xgboost_model.pkl --metrics-output reports/metrics.json 
@@ -45,6 +71,8 @@ stages:
     #outs:
     #- models/xgboost_model.pkl
     #- reports/figures/training
+    
     metrics:
     - reports/metrics.json:
         cache: false
+
