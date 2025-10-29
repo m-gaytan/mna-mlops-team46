@@ -4,41 +4,81 @@
 Verificador de estructura Cookiecutter con estados:
 [PRESENTE], [FALTA-REQUERIDO], [FALTA-RECOMENDADO], [FALTA-OPCIONAL].
 
-Ejecutar desde la raíz del repositorio.
+Uso:
+  python 01_check_structure.py \
+    --project-root "C:\\dev\\mna-mlops-team46" \
+    --module-name german_credit_ml
+
+Los parámetros también pueden darse por variable de entorno:
+  PROJECT_ROOT, MODULE_NAME
 """
 
 import os
 import glob
+import argparse
 from typing import List, Optional, Tuple
 
-ROOT = os.path.abspath(os.curdir)
-ROOT_NAME = os.path.basename(ROOT.rstrip(os.sep)) or "project-name"
+# -------------------- CLI / ENV --------------------
+def parse_args():
+    parser = argparse.ArgumentParser(description="Validador de estructura Cookiecutter")
+    parser.add_argument("--project-root",
+                        default=os.getenv("PROJECT_ROOT", r"C:\dev\mna-mlops-team46"),
+                        help="Ruta absoluta del proyecto (raíz del repo)")
+    parser.add_argument("--module-name",
+                        default=os.getenv("MODULE_NAME", "german_credit_ml"),
+                        help="Nombre del paquete Python bajo src/")
+    return parser.parse_args()
 
-# Niveles de importancia
+ARGS = parse_args()
+
+# Normaliza y cambia a la raíz del proyecto
+ROOT = os.path.abspath(os.path.expanduser(ARGS.project_root))
+if not os.path.isdir(ROOT):
+    raise SystemExit(f"[ERROR] Project root no existe: {ROOT}")
+os.chdir(ROOT)
+
+ROOT_NAME = os.path.basename(ROOT.rstrip(os.sep)) or "project-name"
+MODULE_NAME = ARGS.module_name.strip()
+
+# -------------------- Constantes --------------------
 REQUIRED = "requerido"
 RECOMMENDED = "recomendado"
 OPTIONAL = "opcional"
 
+# -------------------- Utilidades --------------------
 def exists(path: str) -> bool:
     return os.path.exists(os.path.join(ROOT, path))
 
 def first_package_under_src() -> Optional[str]:
+    """Detecta primer paquete válido en src/ si no se especificó MODULE_NAME."""
     candidates = [d for d in glob.glob("src/*") if os.path.isdir(d)]
     for d in sorted(candidates):
         if os.path.isfile(os.path.join(d, "__init__.py")):
             return os.path.basename(d)
     return None
 
+def get_package_name() -> str:
+    """
+    Si existe src/<MODULE_NAME>/__init__.py, usa el nombre dado.
+    Si no, intenta autodetectar; si tampoco, deja placeholder.
+    """
+    candidate = os.path.join("src", MODULE_NAME, "__init__.py")
+    if os.path.isfile(candidate):
+        return MODULE_NAME
+    auto = first_package_under_src()
+    return auto or MODULE_NAME or "<package_name>"
+
 def pyproject_or_requirements_setup() -> Tuple[bool, str]:
     """
-    Regla compuesta (marcada como REQUERIDA):
-    OK si existe pyproject.toml, o bien requirements.txt + setup.cfg
+    Regla compuesta (REQUIRED):
+      OK si existe pyproject.toml, o bien requirements.txt + setup.cfg
     """
     pyproject = exists("pyproject.toml")
     req_setup = exists("requirements.txt") and exists("setup.cfg")
     label = "pyproject.toml     (o requirements.txt + setup.cfg)"
     return (pyproject or req_setup, label)
 
+# -------------------- Modelo de árbol --------------------
 class Node:
     def __init__(
         self,
@@ -46,8 +86,8 @@ class Node:
         path: Optional[str] = None,
         children: Optional[List["Node"]] = None,
         importance: str = REQUIRED,            # requerido | recomendado | opcional
-        optional_note: Optional[str] = None,   # texto corto al lado del label
-        right_note: Optional[str] = None,      # nota a la derecha (columna fija)
+        optional_note: Optional[str] = None,   # texto corto junto al label
+        right_note: Optional[str] = None,      # nota a la derecha (col fija)
         exists_override: Optional[bool] = None # para reglas compuestas
     ):
         self.label = label
@@ -62,13 +102,12 @@ class Node:
         if self.exists_override is not None:
             return self.exists_override
         if self.path is None:
-            # Nodo visual (carpetas de nivel lógico, p.ej. project-name/), se muestra siempre
-            return True
+            return True  # nodo puramente visual
         return exists(self.path)
 
     def missing_tag(self) -> str:
         if self.path is None and self.exists_override is None:
-            return ""  # nodos puramente visuales no se marcan
+            return ""  # no marcar visuales
         if self.exists():
             return "[PRESENTE]"
         if self.importance == REQUIRED:
@@ -78,7 +117,7 @@ class Node:
         return "[FALTA-OPCIONAL]"
 
 def build_template_tree() -> Node:
-    pkg = first_package_under_src() or "<package_name>"
+    pkg = get_package_name()
     ok_req, label_req = pyproject_or_requirements_setup()
 
     return Node(f"{ROOT_NAME}/", path=None, importance=REQUIRED, children=[
@@ -87,7 +126,7 @@ def build_template_tree() -> Node:
         Node(".gitignore", ".gitignore", importance=REQUIRED),
         Node(".env.example", ".env.example", importance=RECOMMENDED, optional_note="(variables, sin secretos)"),
 
-        # Dependencias: regla compuesta (requerido)
+        # Dependencias: regla compuesta
         Node(label_req, None, importance=REQUIRED, exists_override=ok_req),
 
         Node("Makefile", "Makefile", importance=RECOMMENDED, optional_note="(tareas comunes)"),
@@ -121,29 +160,19 @@ def build_template_tree() -> Node:
     ])
 
 def pad_to_column(text: str, col: int) -> str:
-    if len(text) >= col:
-        return text + " "
-    return text + " " * (col - len(text))
+    return text if len(text) >= col else text + " " * (col - len(text))
 
 def render_tree(node: Node, prefix: str = "", is_last: bool = True, right_note_col: int = 70):
     connector = "└─ " if is_last else "├─ "
     line_prefix = prefix + connector if prefix else ""
-    base_label = node.label
-
-    # Añadir notas cortas junto al label con una ligera alineación
-    line = f"{line_prefix}{base_label}"
+    line = f"{line_prefix}{node.label}"
     if node.optional_note:
         line = pad_to_column(line, 40) + node.optional_note
-
-    # Estado
     state = node.missing_tag()
     if state:
         line = pad_to_column(line, 65) + state
-
-    # Nota a la derecha (columna fija)
     if node.right_note:
         line = pad_to_column(line, right_note_col) + node.right_note
-
     print(line)
 
     child_prefix = prefix + ("   " if is_last else "│  ")
@@ -164,3 +193,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
