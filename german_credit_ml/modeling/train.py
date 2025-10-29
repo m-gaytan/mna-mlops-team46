@@ -71,7 +71,7 @@ class DataModule:
         self.target = target
 
     def load(self) -> Tuple[pd.DataFrame, pd.Series]:
-        console.print(f"[bold green][INFO][/bold green] Cargando datos desde: {self.csv_path}")
+        console.print(f"[bold green][INFO][/bold green] Cargando datos desde: [cyan]{self.csv_path}[/cyan]")
         df = pd.read_csv(self.csv_path)
         X, y = df.drop(columns=self.target), df[self.target]
         console.print(f"[bold bright_green][SUCCESS][/bold bright_green] Datos cargados: {X.shape[0]} filas, {X.shape[1]} features.")
@@ -113,7 +113,7 @@ class Evaluator:
     """Clase para calcular métricas y generar gráficas de evaluación."""
     @staticmethod
     def compute_metrics(y_true, y_pred, y_proba) -> Dict[str, float]:
-        console.print("[bold green][INFO][/bold green] Calculando métricas de evaluación...")
+        console.print("\n[bold green][INFO][/bold green] Calculando métricas de evaluación...")
         report = classification_report(y_true, y_pred, output_dict=True, zero_division=0) # Añadir zero_division
         metrics = {
             "f1_score_test": report.get('1', {}).get('f1-score', 0.0),
@@ -141,15 +141,15 @@ class Evaluator:
     def plot_roc(y_true, y_proba, outpath: Path, auc_val: float):
         console.print(f"  -> Generando Curva ROC en [cyan]{outpath.name}[/cyan]...")
         if len(np.unique(y_true)) > 1: # Only plot ROC if both classes are present
-             fpr, tpr, _ = roc_curve(y_true, y_proba)
-             plt.figure(figsize=(8, 6))
-             plt.plot(fpr, tpr, color='darkorange', lw=2, label=f"Curva ROC (AUC = {auc_val:.2f})")
-             plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle="--")
-             plt.xlabel("Tasa de Falsos Positivos"); plt.ylabel("Tasa de Verdaderos Positivos"); plt.title("Curva ROC"); plt.legend(loc="lower right")
-             outpath.parent.mkdir(parents=True, exist_ok=True)
-             plt.savefig(outpath); plt.close()
+            fpr, tpr, _ = roc_curve(y_true, y_proba)
+            plt.figure(figsize=(8, 6))
+            plt.plot(fpr, tpr, color='darkorange', lw=2, label=f"Curva ROC (AUC = {auc_val:.2f})")
+            plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle="--")
+            plt.xlabel("Tasa de Falsos Positivos"); plt.ylabel("Tasa de Verdaderos Positivos"); plt.title("Curva ROC"); plt.legend(loc="lower right")
+            outpath.parent.mkdir(parents=True, exist_ok=True)
+            plt.savefig(outpath); plt.close()
         else:
-             console.print("[yellow]Advertencia:[/yellow] No se puede generar Curva ROC, solo hay una clase en y_true.")
+            console.print("[yellow]Advertencia:[/yellow] No se puede generar Curva ROC, solo hay una clase en y_true.")
 
 
 class ShapInterpreter:
@@ -219,28 +219,28 @@ class MlflowLogger:
     def start_run(self) -> str:
         now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         run_name = f"run_{now}"
-        self.run = mlflow.start_run(run_name=run_name)
+        self.run_info = mlflow.start_run(run_name=run_name).info # Guardar info del run
         console.print("\n" + "="*50, style="bold dim")
-        console.print(f" [bold yellow]Iniciando Run MLflow: {run_name}[/bold yellow] ".center(50, "="), style="bold dim")
+        console.print(f" [bold yellow]Iniciando Run MLflow: {run_name} (ID: {self.run_info.run_id})[/bold yellow] ".center(60, "="), style="bold dim")
         console.print("="*50, style="bold dim")
-        return run_name
+        return self.run_info.run_id # Devolver el ID
 
     def log_params_metrics(self, model: Pipeline, metrics: Dict[str, float]):
-        console.print("[bold green][INFO][/bold green] Registrando parámetros y métricas en MLflow...")
+        console.print("\n[bold green][INFO][/bold green] Registrando parámetros y métricas en MLflow...")
         classifier_params = model.named_steps["clf"].get_params()
         mlflow.log_params(classifier_params)
         mlflow.log_metrics(metrics)
         console.print("[bold bright_green][SUCCESS][/bold bright_green] Parámetros y métricas registrados.")
 
     def log_models(self, model: Pipeline):
-        console.print("[bold green][INFO][/bold green] Registrando modelos en MLflow...")
+        console.print("\n[bold green][INFO][/bold green] Registrando modelos en MLflow...")
         mlflow.sklearn.log_model(model, artifact_path="sklearn-pipeline")
         classifier = model.named_steps["clf"]
         mlflow.xgboost.log_model(classifier, artifact_path="xgboost-model")
         console.print("[bold bright_green][SUCCESS][/bold bright_green] Modelos registrados.")
 
     def log_artifacts(self, artifact_paths: List[Path], subdir: str = "plots"):
-        console.print(f"[bold green][INFO][/bold green] Registrando artefactos en MLflow (subdirectorio: {subdir})...")
+        console.print(f"\n[bold green][INFO][/bold green] Registrando artefactos en MLflow (subdirectorio: {subdir})...")
         for p in artifact_paths:
             if p is None or not p.exists():
                 console.print(f"[yellow]Advertencia:[/yellow] Artefacto no encontrado o nulo, omitiendo: {p}")
@@ -253,7 +253,7 @@ class MlflowLogger:
 
     def end_run(self):
         mlflow.end_run()
-        console.print("[bold green][INFO][/bold green] Run de MLflow finalizado.")
+        console.print("\n[bold green][INFO][/bold green] Run de MLflow finalizado.")
 
 
 class Trainer:
@@ -266,7 +266,6 @@ class Trainer:
     def build_model(self, preprocessor: ColumnTransformer) -> Pipeline:
         """Construye el pipeline final (preprocesador + clasificador)."""
         console.print("\n[bold green][INFO][/bold green] Construyendo pipeline final...")
-        # Usar get_xgb_params() para obtener el diccionario
         xgb_clf = xgb.XGBClassifier(**self.cfg.get_xgb_params())
         model = Pipeline(steps=[("preprocessor", preprocessor), ("clf", xgb_clf)])
         console.print("[bold bright_green][SUCCESS][/bold bright_green] Pipeline construido.")
@@ -275,7 +274,7 @@ class Trainer:
     def run(self):
         """Ejecuta todo el flujo de entrenamiento."""
         print_header() # Imprime encabezado ASCII
-        run_name = self.mlflog.start_run()
+        run_id = self.mlflog.start_run() # Captura el Run ID
 
         # --- Carga y División ---
         data_module = DataModule(self.paths.input_data)
@@ -287,7 +286,7 @@ class Trainer:
 
         # --- Entrenamiento ---
         model = self.build_model(preprocessor)
-        console.print("[bold green][INFO][/bold green] Entrenando el pipeline...")
+        console.print("\n[bold green][INFO][/bold green] Entrenando el pipeline...")
         model.fit(X_train, y_train)
         console.print("[bold bright_green][SUCCESS][/bold bright_green] Pipeline entrenado.")
 
@@ -297,13 +296,11 @@ class Trainer:
         y_proba = model.predict_proba(X_test)[:, 1]
         metrics = Evaluator.compute_metrics(y_test, y_pred, y_proba)
 
-        # Mostrar tabla de métricas
+        # Mostrar tabla de métricas con Rich
         metrics_table = Table(title="📊 Métricas de Evaluación (Conjunto de Prueba)")
         metrics_table.add_column("Métrica", style="cyan", no_wrap=True)
         metrics_table.add_column("Valor", style="magenta")
-        # Asegurarse de iterar sobre el diccionario de métricas calculado
         for k, v in metrics.items():
-            # Formatear nombre de la métrica para la tabla
             metric_name = k.replace('_test', '').replace('_', ' ').title()
             metrics_table.add_row(metric_name, f"{v:.4f}")
         console.print(metrics_table)
@@ -314,38 +311,50 @@ class Trainer:
         cm_path = plots_dir / "confusion_matrix.png"
         roc_path = plots_dir / "roc_curve.png"
         Evaluator.plot_confusion_matrix(y_test, y_pred, cm_path)
-        Evaluator.plot_roc(y_test, y_proba, roc_path, metrics.get("auc_test", 0.0)) # Usar get por seguridad
+        Evaluator.plot_roc(y_test, y_proba, roc_path, metrics.get("auc_test", 0.0))
         console.print(f"[bold bright_green][SUCCESS][/bold bright_green] Gráficas de evaluación guardadas.")
 
         # --- SHAP ---
         shap_paths, shap_importance = ShapInterpreter.explain(model, X_test, plots_dir)
-        # Opcional: Guardar importancia SHAP en CSV y añadir a lista para loguear
-        # shap_csv_path = plots_dir / "shap_top_features.csv"
-        # shap_importance.head(10).to_csv(shap_csv_path, index=False)
-        # shap_paths.append(shap_csv_path)
+        # La lista shap_paths ahora incluye el csv: [bar_path, swarm_path, shap_csv_path]
 
         # --- Guardado y Registro ---
         console.print("\n[bold green][INFO][/bold green] PASO 6: Guardando artefactos locales y registrando en MLflow...")
-        # Guardar para DVC
+        # Guardar Pipeline .pkl para DVC
         with open(self.paths.model_output, "wb") as f:
             pickle.dump(model, f)
         console.print(f" -> Pipeline completo guardado para DVC en: [cyan]{self.paths.model_output}[/cyan]")
-        # Añadir parámetros al dict de métricas para guardar en JSON
+
+        # Guardar Metadatos del Modelo (incluyendo Run ID) para DVC
+        model_metadata = {
+            "mlflow_run_id": run_id,
+            "training_timestamp_utc": datetime.datetime.utcnow().isoformat() + "Z",
+            "model_description": "XGBoost Pipeline for German Credit Risk"
+        }
+        metadata_path = self.paths.model_output.parent / (self.paths.model_output.stem + "_metadata.json")
         try:
-             # Asegurarse que clf está definido aquí o extraerlo de 'model'
-             clf_params = model.named_steps["clf"].get_params()
+            with open(metadata_path, 'w') as f:
+                json.dump(model_metadata, f, indent=4)
+            console.print(f" -> Metadatos del modelo guardados en: [cyan]{metadata_path}[/cyan]")
+        except Exception as e:
+            console.print(f"[bold red]ERROR:[/bold red] No se pudo guardar el archivo de metadatos en {metadata_path}: {e}")
+
+
+        # Guardar Métricas .json para DVC
+        try:
+            clf_params = model.named_steps["clf"].get_params()
         except AttributeError:
-             clf_params = {} # Fallback si 'clf' no existe o no tiene get_params
+            clf_params = {}
         metrics_to_save = {**metrics, "params": clf_params}
         with open(self.paths.metrics_output, "w") as f:
-            json.dump(metrics_to_save, f, indent=4, default=str) # Usar default=str
+            json.dump(metrics_to_save, f, indent=4, default=str)
         console.print(f" -> Métricas guardadas para DVC en: [cyan]{self.paths.metrics_output}[/cyan]")
 
         # Registro en MLflow
         self.mlflog.log_params_metrics(model, metrics)
         self.mlflog.log_models(model)
         # Asegurarse de pasar la lista correcta de paths a log_artifacts
-        artifacts_to_log = [cm_path, roc_path] + shap_paths
+        artifacts_to_log = [cm_path, roc_path] + shap_paths # shap_paths ya incluye el csv
         self.mlflog.log_artifacts(artifacts_to_log, subdir="plots")
         self.mlflog.end_run()
 
@@ -354,7 +363,7 @@ class Trainer:
 
 # --- Bloque de ejecución principal ---
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Entrena Pipeline Sklearn con XGBoost (OOP)!.")
+    parser = argparse.ArgumentParser(description="Entrena Pipeline Sklearn con XGBoost (OOP).")
     parser.add_argument("--input-data", required=True, type=Path)
     parser.add_argument("--model-output", required=True, type=Path)
     parser.add_argument("--metrics-output", required=True, type=Path)
