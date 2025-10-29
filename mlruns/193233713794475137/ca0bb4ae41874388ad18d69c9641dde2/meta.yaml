@@ -1,0 +1,14 @@
+artifact_uri: file:///C:/Users/User/Documents/MNA/MLOps/Poyecto_MLOps_Equipo_46/mlruns/193233713794475137/ca0bb4ae41874388ad18d69c9641dde2/artifacts
+end_time: 1761713829280
+entry_point_name: ''
+experiment_id: '193233713794475137'
+lifecycle_stage: active
+run_id: ca0bb4ae41874388ad18d69c9641dde2
+run_name: run_2025-10-28_22-56-47
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1761713808197
+status: 3
+tags: []
+user_id: User

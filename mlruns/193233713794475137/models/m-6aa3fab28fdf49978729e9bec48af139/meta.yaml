@@ -1,0 +1,10 @@
+artifact_location: file:///C:/Users/User/Documents/MNA/MLOps/Poyecto_MLOps_Equipo_46/mlruns/193233713794475137/models/m-6aa3fab28fdf49978729e9bec48af139/artifacts
+creation_timestamp: 1761713822298
+experiment_id: '193233713794475137'
+last_updated_timestamp: 1761713829245
+model_id: m-6aa3fab28fdf49978729e9bec48af139
+model_type: null
+name: xgboost-model
+source_run_id: ca0bb4ae41874388ad18d69c9641dde2
+status: 2
+status_message: null
