@@ -73,3 +73,18 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     run_eda(Path(args.input_data), Path(args.output_dir))
+
+# --- Guardar resumen de datos para comparación ---
+    
+    # 1. Estadísticas descriptivas de variables numéricas
+    desc_stats = df.describe().round(2)
+    desc_file = Path("outputs_original") / "describe.csv"
+    desc_file.parent.mkdir(parents=True, exist_ok=True)  # Crear carpeta si no existe
+    desc_stats.to_csv(desc_file)
+    print(f" -> Resumen estadístico guardado en: {desc_file}")
+
+    # 2. Conteo de la variable objetivo
+    target_counts = df['credit_risk'].value_counts().sort_index()
+    target_file = Path("outputs_original") / "target_counts.csv"
+    target_counts.to_csv(target_file, header=True)
+    print(f" -> Conteo de la variable objetivo guardado en: {target_file}")
