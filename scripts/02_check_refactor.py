@@ -23,7 +23,14 @@ import ast
 import glob
 import argparse
 from typing import List, Tuple, Optional, Dict
+import sys
+import io
 
+# Forzar stdout/stderr a UTF-8 en Windows para caracteres como ├─, └─, etc.
+if sys.stdout.encoding is None or "cp125" in sys.stdout.encoding.lower():
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+if sys.stderr.encoding is None or "cp125" in sys.stderr.encoding.lower():
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 # -------------------- Config CLI / ENV --------------------
 def parse_args():
     parser = argparse.ArgumentParser(description="Validador de refactorización/modularización")
