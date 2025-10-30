@@ -80,3 +80,16 @@ if __name__ == '__main__':
 
     eda = EDAVisualizer(Path(args.input_data), Path(args.output_dir))
     eda.run()
+
+# --- Guardar resumen de datos para comparación ---
+    
+    desc_stats = df.describe().round(2)
+    desc_file = Path("outputs_v2") / "describe.csv"
+    desc_file.parent.mkdir(parents=True, exist_ok=True)
+    desc_stats.to_csv(desc_file)
+    print(f" -> Resumen estadístico guardado en: {desc_file}")
+
+    target_counts = df['credit_risk'].value_counts().sort_index()
+    target_file = Path("outputs_v2") / "target_counts.csv"
+    target_counts.to_csv(target_file, header=True)
+    print(f" -> Conteo de la variable objetivo guardado en: {target_file}")
