@@ -1,0 +1,14 @@
+artifact_uri: file:///C:/Users/User/Documents/MNA/MLOps/Poyecto_MLOps_Equipo_46/mlruns/0/b8d8dd8c67cb4f628e8874cba54b181e/artifacts
+end_time: 1759879333461
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: b8d8dd8c67cb4f628e8874cba54b181e
+run_name: crawling-goat-746
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1759879320207
+status: 3
+tags: []
+user_id: User

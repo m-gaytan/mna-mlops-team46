@@ -1,0 +1,10 @@
+artifact_location: file:///C:/Users/User/Documents/MNA/MLOps/Poyecto_MLOps_Equipo_46/mlruns/193233713794475137/models/m-d828e87c35874cf5be99a0deec46324c/artifacts
+creation_timestamp: 1761715787374
+experiment_id: '193233713794475137'
+last_updated_timestamp: 1761715797539
+model_id: m-d828e87c35874cf5be99a0deec46324c
+model_type: null
+name: sklearn-pipeline
+source_run_id: 600ce0e7a7f44ad1ba81075227a7fa48
+status: 2
+status_message: null

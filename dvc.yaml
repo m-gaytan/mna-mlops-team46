@@ -21,6 +21,7 @@ stages:
     outs:
     - reports/figures/eda
   train:
+<<<<<<< HEAD
 
     #OOP
 
@@ -76,3 +77,20 @@ stages:
     - reports/metrics.json:
         cache: false
 
+=======
+    cmd: python -m german_credit_ml.modeling.train --input-data 
+      data/processed/german_credit_clean.csv --model-output 
+      models/xgboost_model.pkl --metrics-output reports/metrics.json 
+      --plots-output reports/figures/training
+    deps:
+    - data/processed/german_credit_clean.csv
+    - german_credit_ml/modeling/train.py
+    outs:
+    - models/xgboost_model.pkl
+    - reports/figures/training
+    metrics:
+    - reports/metrics.json:
+        cache: false
+    params:
+    - train
+>>>>>>> 40cba31092d0e9d18cd706221b6efdfafc8ad3a5

@@ -7,6 +7,11 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import OneHotEncoder 
+
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
     f1_score, roc_auc_score, accuracy_score, precision_score, recall_score,
@@ -71,6 +76,26 @@ def main(args):
         )
         print("Datos divididos en train/test.")
 
+        #==== PASO 2: Preprocesamiento + Entrenamiento (Pipeline) ====
+        num_cols = X_train.select_dtypes(include=["number"]).columns.tolist()
+        cat_cols = [c for c in X_train.columns if c not in num_cols]
+
+        num_transformer = SimpleImputer(strategy="median")  # XGB no necesita escalar
+        cat_transformer = Pipeline(steps=[
+            ("imputer", SimpleImputer(strategy="most_frequent")),
+            ("ohe", OneHotEncoder(handle_unknown="ignore", sparse_output=False))
+        ])
+
+        # ColumnTransformer que aplica cada paso a sus columnas
+        preprocessor = ColumnTransformer(
+            transformers=[
+                ("num", num_transformer, num_cols),
+                ("cat", cat_transformer, cat_cols),
+            ],
+            remainder="drop"   # o "passthrough" si quieres dejar columnas no listadas
+        )
+
+
         # === PASO 2: Entrenamiento (XGBoost) ===
         print("\n==== PASO 2: Entrenamiento del Modelo ====")
         params = {
@@ -87,13 +112,21 @@ def main(args):
         }
         print("Parámetros XGBoost:", params)
 
-        model = XGBClassifier(**params)
-        model.fit(X_train, y_train)
+        #model = XGBClassifier(**params)
+        #model.fit(X_train, y_train)
+
+        pipeline = Pipeline(steps=[
+            ("preprocess", preprocessor),
+            ("clf", XGBClassifier(**params)),
+        ])
+
+        # Entrenar el pipeline con los datos crudos (sin transformar)
+        pipeline.fit(X_train, y_train)
 
         # === PASO 3: Evaluación ===
         print("\n==== PASO 3: Evaluación, Guardado y Registro ====")
-        y_pred  = model.predict(X_test)
-        y_proba = model.predict_proba(X_test)[:, 1]
+        y_pred  = pipeline.predict(X_test)
+        y_proba = pipeline.predict_proba(X_test)[:, 1]
 
         f1  = f1_score(y_test, y_pred)
         auc = roc_auc_score(y_test, y_proba)
@@ -186,7 +219,7 @@ def main(args):
 
         try:
             mlflow.sklearn.log_model(
-                sk_model=model,
+                sk_model=pipeline,
                 name="model",                     # MLflow nuevo
                 input_example=X_example,
                 signature=signature,
@@ -194,7 +227,7 @@ def main(args):
             )
         except TypeError:
             mlflow.sklearn.log_model(
-                sk_model=model,
+                sk_model=pipeline,
                 artifact_path="model",            # compatibilidad
                 input_example=X_example,
                 signature=signature,

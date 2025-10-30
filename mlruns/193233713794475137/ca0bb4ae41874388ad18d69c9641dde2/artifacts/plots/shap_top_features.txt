@@ -1,0 +1,11 @@
+                     feature  importance
+                 num__status    1.027561
+                 num__amount    0.447914
+               num__duration    0.445789
+                num__savings    0.352127
+    num__employment_duration    0.341926
+                num__purpose    0.334203
+         num__credit_history    0.268556
+                    num__age    0.242777
+               num__property    0.209871
+num__other_installment_plans    0.188983
